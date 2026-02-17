@@ -8,3 +8,7 @@ __pycache__
 # Test artifacts
 test/test_jsonrpc
 test/ArduinoJson.h
+
+# Test binaries
+test/native/test_jsonrpc
+test/native/test_mcp_http

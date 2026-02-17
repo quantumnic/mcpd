@@ -6,6 +6,7 @@
 
 Expose ESP32/RP2040 hardware as AI-accessible tools via [Model Context Protocol](https://modelcontextprotocol.io)
 
+[![Native Tests](https://github.com/redbasecap-buiss/mcpd/actions/workflows/test.yml/badge.svg)](https://github.com/redbasecap-buiss/mcpd/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![PlatformIO](https://img.shields.io/badge/PlatformIO-compatible-orange.svg)](https://platformio.org)
 [![Arduino](https://img.shields.io/badge/Arduino-compatible-teal.svg)](https://www.arduino.cc)
@@ -182,6 +183,25 @@ mcpd implements the [MCP specification 2025-03-26](https://modelcontextprotocol.
 - [ ] WebSocket transport option
 - [ ] Authentication (API key / mTLS)
 - [ ] Prompts support
+
+## Native Testing
+
+mcpd can be compiled and tested on macOS/Linux **without any hardware**. The test harness includes Arduino API mocks and a real POSIX socket HTTP server, so tests send actual HTTP requests against the MCP server running on localhost.
+
+```bash
+# Run all tests (unit + HTTP integration)
+make test
+```
+
+**What gets tested:**
+- **20 unit tests** — JSON-RPC parsing, dispatch, error handling, batch requests
+- **15 HTTP integration tests** — Real HTTP requests against a POSIX socket MCP server: initialize, tools/list, tools/call, resources, sessions, CORS, batch, notifications
+
+**Test architecture:**
+- `test/arduino_mock.h` — Arduino API stubs (String, Serial, GPIO, WiFi, mDNS, I2C)
+- `test/mocks/` — Per-header mock files including EEPROM (RAM-backed)
+- `test/native/test_mcp_http.cpp` — HTTP integration tests with embedded POSIX socket server
+- `test/test_jsonrpc.cpp` — Unit tests calling JSON-RPC layer directly
 
 ## Examples
 
