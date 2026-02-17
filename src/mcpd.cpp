@@ -54,7 +54,14 @@ void Server::setMDNS(bool enabled) { _mdnsEnabled = enabled; }
 // ════════════════════════════════════════════════════════════════════════
 
 void Server::begin() {
+    // Seed random for session ID generation
+    randomSeed(esp_random());
+
     _httpServer = new WebServer(_port);
+
+    // Collect headers we need to read
+    const char* headerKeys[] = { transport::HEADER_SESSION_ID };
+    _httpServer->collectHeaders(headerKeys, 1);
 
     // Register MCP endpoint handlers
     _httpServer->on(_endpoint, HTTP_POST, [this]() { _handleMCPPost(); });
@@ -205,6 +212,12 @@ String Server::_processJsonRpc(const String& body) {
     const char* method = doc["method"];
     JsonVariant id = doc["id"];
 
+    // Validate JSON-RPC version
+    const char* version = doc["jsonrpc"];
+    if (!version || strcmp(version, "2.0") != 0) {
+        return _jsonRpcError(id, -32600, "Invalid Request: missing or wrong jsonrpc version");
+    }
+
     if (!method) {
         return _jsonRpcError(id, -32600, "Invalid Request: missing method");
     }
@@ -298,8 +311,15 @@ String Server::_handleToolsCall(JsonVariant params, JsonVariant id) {
         if (tool.name == toolName) {
             JsonObject arguments = params["arguments"].as<JsonObject>();
 
-            // Call the handler
-            String handlerResult = tool.handler(arguments);
+            // Call the handler with error catching
+            String handlerResult;
+            bool isError = false;
+            try {
+                handlerResult = tool.handler(arguments);
+            } catch (...) {
+                handlerResult = "Internal tool error";
+                isError = true;
+            }
 
             // Build MCP result with content array
             JsonDocument result;
@@ -307,6 +327,9 @@ String Server::_handleToolsCall(JsonVariant params, JsonVariant id) {
             JsonObject textContent = content.add<JsonObject>();
             textContent["type"] = "text";
             textContent["text"] = handlerResult;
+            if (isError) {
+                result["isError"] = true;
+            }
 
             String resultStr;
             serializeJson(result, resultStr);
@@ -314,7 +337,8 @@ String Server::_handleToolsCall(JsonVariant params, JsonVariant id) {
         }
     }
 
-    return _jsonRpcError(id, -32602, "Tool not found");
+    return _jsonRpcError(id, -32602,
+        (String("Tool not found: ") + toolName).c_str());
 }
 
 String Server::_handleResourcesList(JsonVariant params, JsonVariant id) {

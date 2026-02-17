@@ -103,7 +103,11 @@ public:
     /** Get port */
     uint16_t getPort() const { return _port; }
 
+#ifdef MCPD_TEST
+public:  // Allow test access to internals
+#else
 private:
+#endif
     const char* _name;
     uint16_t _port;
     const char* _endpoint = "/mcp";
