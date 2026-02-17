@@ -1,0 +1,24 @@
+title: "🎉 Show & Tell: "
+labels: ["show-and-tell"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Built something cool with mcpd? Share it with the community!
+  - type: textarea
+    id: project
+    attributes:
+      label: What did you build?
+      description: Describe your project and how mcpd is used.
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Technical details
+      description: Hardware, tools exposed, MCP clients used, etc.
+  - type: textarea
+    id: links
+    attributes:
+      label: Links / Media
+      description: GitHub repo, photos, videos, blog posts...

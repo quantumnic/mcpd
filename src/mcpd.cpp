@@ -42,6 +42,16 @@ void Server::addResource(const MCPResource& resource) {
     _resources.push_back(resource);
 }
 
+void Server::addResourceTemplate(const char* uriTemplate, const char* name,
+                                 const char* description, const char* mimeType,
+                                 MCPResourceTemplateHandler handler) {
+    _resourceTemplates.emplace_back(uriTemplate, name, description, mimeType, handler);
+}
+
+void Server::addResourceTemplate(const MCPResourceTemplate& tmpl) {
+    _resourceTemplates.push_back(tmpl);
+}
+
 // ════════════════════════════════════════════════════════════════════════
 // Configuration
 // ════════════════════════════════════════════════════════════════════════
@@ -243,6 +253,7 @@ String Server::_dispatch(const char* method, JsonVariant params, JsonVariant id)
     if (m == "tools/call")       return _handleToolsCall(params, id);
     if (m == "resources/list")   return _handleResourcesList(params, id);
     if (m == "resources/read")   return _handleResourcesRead(params, id);
+    if (m == "resources/templates/list") return _handleResourcesTemplatesList(params, id);
 
     // notifications/initialized — no response needed
     if (m == "notifications/initialized") return "";
@@ -273,7 +284,7 @@ String Server::_handleInitialize(JsonVariant params, JsonVariant id) {
     }
 
     // Advertise resources capability
-    if (!_resources.empty()) {
+    if (!_resources.empty() || !_resourceTemplates.empty()) {
         capabilities["resources"].to<JsonObject>();
     }
 
@@ -378,7 +389,40 @@ String Server::_handleResourcesRead(JsonVariant params, JsonVariant id) {
         }
     }
 
+    // Try matching against resource templates
+    for (const auto& tmpl : _resourceTemplates) {
+        std::map<String, String> params;
+        if (tmpl.match(String(uri), params)) {
+            String content = tmpl.handler(params);
+
+            JsonDocument result;
+            JsonArray contents = result["contents"].to<JsonArray>();
+            JsonObject item = contents.add<JsonObject>();
+            item["uri"] = uri;
+            item["mimeType"] = tmpl.mimeType;
+            item["text"] = content;
+
+            String resultStr;
+            serializeJson(result, resultStr);
+            return _jsonRpcResult(id, resultStr);
+        }
+    }
+
     return _jsonRpcError(id, -32602, "Resource not found");
+}
+
+String Server::_handleResourcesTemplatesList(JsonVariant params, JsonVariant id) {
+    JsonDocument result;
+    JsonArray templates = result["resourceTemplates"].to<JsonArray>();
+
+    for (const auto& tmpl : _resourceTemplates) {
+        JsonObject obj = templates.add<JsonObject>();
+        tmpl.toJson(obj);
+    }
+
+    String resultStr;
+    serializeJson(result, resultStr);
+    return _jsonRpcResult(id, resultStr);
 }
 
 // ════════════════════════════════════════════════════════════════════════

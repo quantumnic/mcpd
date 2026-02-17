@@ -21,6 +21,7 @@
 
 #include "MCPTool.h"
 #include "MCPResource.h"
+#include "MCPResourceTemplate.h"
 #include "MCPTransport.h"
 
 #define MCPD_VERSION "0.1.0"
@@ -71,6 +72,18 @@ public:
 
     void addResource(const MCPResource& resource);
 
+    // ── Resource Template registration ─────────────────────────────────
+
+    /**
+     * Register a resource template with URI template (RFC 6570 Level 1).
+     * E.g. "sensor://{sensor_id}/reading"
+     */
+    void addResourceTemplate(const char* uriTemplate, const char* name,
+                             const char* description, const char* mimeType,
+                             MCPResourceTemplateHandler handler);
+
+    void addResourceTemplate(const MCPResourceTemplate& tmpl);
+
     // ── Lifecycle ──────────────────────────────────────────────────────
 
     /**
@@ -119,6 +132,7 @@ private:
 
     std::vector<MCPTool> _tools;
     std::vector<MCPResource> _resources;
+    std::vector<MCPResourceTemplate> _resourceTemplates;
 
     // ── JSON-RPC dispatch ──────────────────────────────────────────────
 
@@ -136,6 +150,7 @@ private:
     String _handleToolsCall(JsonVariant params, JsonVariant id);
     String _handleResourcesList(JsonVariant params, JsonVariant id);
     String _handleResourcesRead(JsonVariant params, JsonVariant id);
+    String _handleResourcesTemplatesList(JsonVariant params, JsonVariant id);
     String _handlePing(JsonVariant id);
 
     // ── Helpers ────────────────────────────────────────────────────────

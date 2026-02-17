@@ -1,0 +1,30 @@
+title: "💡 Idea: "
+labels: ["enhancement", "idea"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share your ideas for mcpd! Whether it's a new tool, platform support, or integration — we'd love to hear it.
+  - type: textarea
+    id: idea
+    attributes:
+      label: Describe your idea
+      description: What would you like to see in mcpd?
+      placeholder: "I think mcpd should support..."
+    validations:
+      required: true
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use case
+      description: How would you use this feature?
+      placeholder: "In my project, I need..."
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Target platform
+      options:
+        - ESP32
+        - RP2040 / Pico W
+        - Both
+        - Other
