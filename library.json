@@ -2,7 +2,22 @@
   "name": "mcpd",
   "version": "0.1.0",
   "description": "MCP Server SDK for Microcontrollers — Expose ESP32/RP2040 hardware as AI-accessible tools via Model Context Protocol",
-  "keywords": "mcp, model-context-protocol, esp32, arduino, iot, ai, embedded, json-rpc, claude",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "esp32",
+    "rp2040",
+    "arduino",
+    "iot",
+    "ai",
+    "embedded",
+    "json-rpc",
+    "claude",
+    "llm",
+    "tools",
+    "streaming",
+    "sse"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/redbasecap-buiss/mcpd.git"
@@ -10,7 +25,8 @@
   "authors": [
     {
       "name": "Nicola Spieser",
-      "url": "https://github.com/redbasecap-buiss"
+      "url": "https://github.com/redbasecap-buiss",
+      "maintainer": true
     }
   ],
   "license": "MIT",

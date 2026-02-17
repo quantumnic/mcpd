@@ -1,10 +1,16 @@
 <div align="center">
 
-# ⚡ mcpd
+```
+                              ___
+   _ __ ___   ___ _ __   __| |
+  | '_ ` _ \ / __| '_ \ / _` |
+  | | | | | | (__| |_) | (_| |
+  |_| |_| |_|\___| .__/ \__,_|
+                  |_|
+  ⚡ MCP Server SDK for Microcontrollers
+```
 
-**MCP Server SDK for Microcontrollers**
-
-Expose ESP32/RP2040 hardware as AI-accessible tools via [Model Context Protocol](https://modelcontextprotocol.io)
+**Expose ESP32/RP2040 hardware as AI-accessible tools via [Model Context Protocol](https://modelcontextprotocol.io)**
 
 [![Native Tests](https://github.com/redbasecap-buiss/mcpd/actions/workflows/test.yml/badge.svg)](https://github.com/redbasecap-buiss/mcpd/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -15,9 +21,6 @@ Expose ESP32/RP2040 hardware as AI-accessible tools via [Model Context Protocol]
 
 </div>
 
-<!-- TODO: Replace with actual GIF of Claude controlling hardware via mcpd -->
-<!-- ![mcpd demo](docs/demo.gif) -->
-
 ---
 
 **mcpd** turns your microcontroller into a standards-compliant MCP server. Claude Desktop, Cursor, or any MCP client can discover and interact with your hardware — read sensors, toggle GPIOs, control servos — using the same protocol they use for any other tool.
@@ -26,19 +29,22 @@ Expose ESP32/RP2040 hardware as AI-accessible tools via [Model Context Protocol]
 
 ## Why mcpd?
 
-| | mcpd | ESP32MCPServer | esp-mcp |
-|---|---|---|---|
-| Runs on the MCU | ✅ | ✅ | ❌ (CLI tool) |
-| MCP spec compliant | ✅ (2025-03-26) | ❌ (custom WebSocket) | ❌ |
-| Compiles | ✅ | ❌ (self-described) | N/A |
+| Feature | mcpd | ESP32MCPServer | esp-mcp |
+|---|:---:|:---:|:---:|
+| Runs on the MCU | ✅ | ✅ | ❌ CLI tool |
+| MCP spec compliant | ✅ 2025-03-26 | ❌ custom WS | ❌ |
+| Actually compiles | ✅ 35 tests | ❌ self-described | N/A |
 | Streamable HTTP + SSE | ✅ | ❌ | ❌ |
+| WebSocket transport | ✅ | ✅ | ❌ |
 | Claude Desktop bridge | ✅ | ❌ | ❌ |
 | mDNS discovery | ✅ | ❌ | ❌ |
-| Built-in tools (GPIO, I2C, Servo…) | ✅ | ❌ | ❌ |
+| Resource Templates (RFC 6570) | ✅ | ❌ | ❌ |
+| Built-in tools (GPIO, I2C, Servo…) | ✅ 8 tools | ❌ | ❌ |
 | Authentication | ✅ | ❌ | ❌ |
 | OTA Updates | ✅ | ❌ | ❌ |
 | Prometheus Metrics | ✅ | ❌ | ❌ |
-| Captive Portal Setup | ✅ | ❌ | ❌ |
+| Captive Portal + Setup CLI | ✅ | ❌ | ❌ |
+| Hardware Abstraction Layer | ✅ | ❌ | ❌ |
 | Multi-platform (ESP32, RP2040) | ✅ | ESP32 only | ESP32 only |
 
 ## Architecture
@@ -47,22 +53,35 @@ Expose ESP32/RP2040 hardware as AI-accessible tools via [Model Context Protocol]
 ┌──────────────────────┐         ┌─────────────────────────────┐
 │   Claude Desktop /   │  stdio  │      mcpd-bridge            │
 │   Cursor / any MCP   │◄───────►│   (Python, runs on host)    │
-│   Client             │         │                             │
+│   Client             │         │   Auto-discovers via mDNS   │
 └──────────────────────┘         └──────────┬──────────────────┘
-                                            │ HTTP POST/SSE
-                                            │ (Streamable HTTP)
-                                            ▼
-                                 ┌─────────────────────────────┐
-                                 │        ESP32 / RP2040       │
-                                 │    ┌─────────────────────┐  │
-                                 │    │      mcpd server     │  │
-                                 │    │  ┌────┐ ┌────┐      │  │
-                                 │    │  │GPIO│ │I2C │ ...   │  │
-                                 │    │  └────┘ └────┘      │  │
-                                 │    └─────────────────────┘  │
-                                 │    mDNS: _mcp._tcp          │
-                                 │    /metrics (Prometheus)    │
-                                 └─────────────────────────────┘
+                                            │
+                              ┌─────────────┼─────────────┐
+                              │ HTTP POST   │ SSE GET     │ WebSocket
+                              │ (Streamable HTTP)         │
+                              ▼             ▼             ▼
+                   ┌──────────────────────────────────────────┐
+                   │            ESP32 / RP2040                 │
+                   │  ┌──────────────────────────────────────┐│
+                   │  │           mcpd::Server                ││
+                   │  │  ┌────────────┐  ┌────────────────┐  ││
+                   │  │  │ Transport  │  │   Dispatch      │  ││
+                   │  │  │ HTTP/SSE/WS│  │ JSON-RPC 2.0   │  ││
+                   │  │  └────────────┘  └───────┬────────┘  ││
+                   │  │          ┌───────────────┬┼──────┐   ││
+                   │  │          ▼               ▼▼      ▼   ││
+                   │  │  ┌─────────────┐ ┌──────────┐ ┌───┐ ││
+                   │  │  │Tools (8)    │ │Resources │ │Tpl│ ││
+                   │  │  │GPIO PWM I2C │ │Readings  │ │URI│ ││
+                   │  │  │Servo DHT NP │ │Status    │ │   │ ││
+                   │  │  │WiFi System  │ │Custom    │ │   │ ││
+                   │  │  └─────────────┘ └──────────┘ └───┘ ││
+                   │  └──────────────────────────────────────┘│
+                   │  ┌──────────────────────────────────────┐│
+                   │  │ Platform HAL │ Auth │ OTA │ Metrics  ││
+                   │  └──────────────────────────────────────┘│
+                   │  mDNS: _mcp._tcp    /metrics (Prometheus)│
+                   └──────────────────────────────────────────┘
 ```
 
 ## Quick Start
@@ -272,13 +291,16 @@ For full API documentation, see [docs/API.md](docs/API.md).
 | [`weather_station`](examples/weather_station/) | Temperature, humidity, pressure as MCP resources | ESP32 + DHT22 + BMP280 |
 | [`robot_arm`](examples/robot_arm/) | Claude controls a 4-DOF servo robot arm | ESP32 + 4× servos |
 
-## Supported Hardware
+## Supported Platforms
 
-| Platform | Status | Notes |
-|----------|--------|-------|
-| ESP32 / ESP32-S2 / S3 / C3 | ✅ Supported | WiFi built-in |
-| RP2040 (Pico W) | 🔜 Planned | WiFi via CYW43 |
-| STM32 + Ethernet | 🔜 Planned | Requires Ethernet shield |
+| Platform | Status | WiFi | Flash | RAM | Notes |
+|----------|--------|------|-------|-----|-------|
+| **ESP32** | ✅ Stable | Built-in | 4 MB | 520 KB | Recommended for beginners |
+| **ESP32-S2** | ✅ Stable | Built-in | 4 MB | 320 KB | Single-core, USB native |
+| **ESP32-S3** | ✅ Stable | Built-in | 8 MB | 512 KB | Dual-core, AI acceleration |
+| **ESP32-C3** | ✅ Stable | Built-in | 4 MB | 400 KB | RISC-V, low power |
+| **RP2040 (Pico W)** | 🧪 HAL ready | CYW43 | 2 MB | 264 KB | Platform HAL implemented |
+| **STM32 + Ethernet** | 🔜 Planned | External | Varies | Varies | Requires Ethernet shield |
 
 ## MCP Compliance
 
@@ -317,10 +339,13 @@ make test
 - [x] Configuration persistence (NVS + Captive Portal)
 - [x] OTA updates
 - [x] Prometheus metrics
-- [ ] RP2040 (Pico W) support
+- [x] WebSocket transport
+- [x] Hardware Abstraction Layer (ESP32 + RP2040)
+- [x] Interactive serial setup CLI
+- [x] Resource Templates (RFC 6570 Level 1)
+- [ ] RP2040 (Pico W) full platform testing
 - [ ] Built-in MQTT tool
 - [ ] Prompts support
-- [ ] WebSocket transport
 - [ ] mTLS authentication
 
 ## License

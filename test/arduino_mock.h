@@ -69,6 +69,34 @@ public:
     char& operator[](unsigned int i) { return _s[i]; }
     void reserve(unsigned int size) { _s.reserve(size); }
 
+    // indexOf / substring needed by MCPResourceTemplate
+    int indexOf(char ch, unsigned int from = 0) const {
+        auto pos = _s.find(ch, from);
+        return pos == std::string::npos ? -1 : (int)pos;
+    }
+    int indexOf(const String& str, unsigned int from = 0) const {
+        auto pos = _s.find(str._s, from);
+        return pos == std::string::npos ? -1 : (int)pos;
+    }
+    int indexOf(const char* str, unsigned int from = 0) const {
+        auto pos = _s.find(str, from);
+        return pos == std::string::npos ? -1 : (int)pos;
+    }
+    String substring(unsigned int from) const {
+        if (from >= _s.size()) return String("");
+        return String(_s.substr(from));
+    }
+    String substring(unsigned int from, unsigned int to) const {
+        if (from >= _s.size()) return String("");
+        return String(_s.substr(from, to - from));
+    }
+    bool startsWith(const String& prefix) const {
+        return _s.compare(0, prefix._s.size(), prefix._s) == 0;
+    }
+    bool startsWith(const char* prefix) const {
+        return _s.compare(0, strlen(prefix), prefix) == 0;
+    }
+
     // Needed for ArduinoJson's Writer to reset the string
     String& operator=(const char* s) { _s = s ? s : ""; return *this; }
     String& operator=(std::nullptr_t) { _s.clear(); return *this; }
