@@ -282,6 +282,9 @@ mcpd implements MCP specification 2025-03-26 via Streamable HTTP transport.
 | `tools/call` | Execute a tool |
 | `resources/list` | List available resources |
 | `resources/read` | Read a resource |
+| `resources/templates/list` | List resource templates |
+| `prompts/list` | List available prompts |
+| `prompts/get` | Get a prompt with arguments filled in |
 
 ### Session Management
 

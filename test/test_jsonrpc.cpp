@@ -39,6 +39,20 @@ static Server* makeTestServer() {
     s->addResource("test://data", "Test Data", "Test resource", "application/json",
         []() -> String { return "{\"value\":42}"; });
 
+    s->addPrompt("greet", "Generate a greeting",
+        {
+            MCPPromptArgument("name", "Person to greet", true),
+            MCPPromptArgument("style", "Greeting style", false)
+        },
+        [](const std::map<String, String>& args) -> std::vector<MCPPromptMessage> {
+            String name = args.at("name");
+            String style = "friendly";
+            auto it = args.find("style");
+            if (it != args.end()) style = it->second;
+            String msg = String("Please greet ") + name + " in a " + style + " way.";
+            return { MCPPromptMessage("user", msg.c_str()) };
+        });
+
     return s;
 }
 
@@ -219,6 +233,61 @@ TEST(batch_request) {
     ASSERT(resp.c_str()[0] == '[');
     ASSERT_STR_CONTAINS(resp.c_str(), "\"id\":20");
     ASSERT_STR_CONTAINS(resp.c_str(), "\"id\":21");
+}
+
+TEST(initialize_advertises_prompts_capability) {
+    auto* s = makeTestServer();
+    String req = R"({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}})";
+    String resp = s->_processJsonRpc(req);
+
+    ASSERT_STR_CONTAINS(resp.c_str(), "\"prompts\"");
+}
+
+TEST(prompts_list_returns_all_prompts) {
+    auto* s = makeTestServer();
+    String req = R"({"jsonrpc":"2.0","id":30,"method":"prompts/list","params":{}})";
+    String resp = s->_processJsonRpc(req);
+
+    ASSERT_STR_CONTAINS(resp.c_str(), "\"greet\"");
+    ASSERT_STR_CONTAINS(resp.c_str(), "\"name\"");
+    ASSERT_STR_CONTAINS(resp.c_str(), "\"required\":true");
+}
+
+TEST(prompts_get_returns_messages) {
+    auto* s = makeTestServer();
+    String req = R"({"jsonrpc":"2.0","id":31,"method":"prompts/get","params":{"name":"greet","arguments":{"name":"World"}}})";
+    String resp = s->_processJsonRpc(req);
+
+    ASSERT_STR_CONTAINS(resp.c_str(), "\"role\":\"user\"");
+    ASSERT_STR_CONTAINS(resp.c_str(), "World");
+    ASSERT_STR_CONTAINS(resp.c_str(), "friendly");
+}
+
+TEST(prompts_get_with_optional_arg) {
+    auto* s = makeTestServer();
+    String req = R"({"jsonrpc":"2.0","id":32,"method":"prompts/get","params":{"name":"greet","arguments":{"name":"Alice","style":"formal"}}})";
+    String resp = s->_processJsonRpc(req);
+
+    ASSERT_STR_CONTAINS(resp.c_str(), "Alice");
+    ASSERT_STR_CONTAINS(resp.c_str(), "formal");
+}
+
+TEST(prompts_get_missing_required_arg) {
+    auto* s = makeTestServer();
+    String req = R"({"jsonrpc":"2.0","id":33,"method":"prompts/get","params":{"name":"greet","arguments":{}}})";
+    String resp = s->_processJsonRpc(req);
+
+    ASSERT_STR_CONTAINS(resp.c_str(), "\"error\"");
+    ASSERT_STR_CONTAINS(resp.c_str(), "Missing required argument");
+}
+
+TEST(prompts_get_not_found) {
+    auto* s = makeTestServer();
+    String req = R"({"jsonrpc":"2.0","id":34,"method":"prompts/get","params":{"name":"nonexistent"}})";
+    String resp = s->_processJsonRpc(req);
+
+    ASSERT_STR_CONTAINS(resp.c_str(), "\"error\"");
+    ASSERT_STR_CONTAINS(resp.c_str(), "Prompt not found");
 }
 
 TEST(empty_body_parse_error) {

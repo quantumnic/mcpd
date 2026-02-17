@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] - 2026-02-17
+
+### Added
+- **Built-in MQTT Tool** (`MCPMQTTTool.h`) — connect, publish, subscribe, read messages, check status
+  - Message buffering with configurable limit (50 messages)
+  - Automatic re-subscription on reconnect
+  - Custom message callback support
+  - Requires PubSubClient library
+- **Prompts support** (`MCPPrompt.h`) — MCP `prompts/list` and `prompts/get` methods
+  - Define reusable prompt templates with typed arguments (required/optional)
+  - Handlers return structured messages (text or embedded resources)
+  - Full argument validation with error reporting
+  - Capability negotiation: prompts advertised in `initialize` response
+- New example: `mqtt_bridge` — MQTT pub/sub bridge for IoT integration
+- 6 new unit tests for prompts (26 total unit tests, 41 total)
+
 ## [0.1.0] - 2026-02-17
 
 ### Added

@@ -22,9 +22,10 @@
 #include "MCPTool.h"
 #include "MCPResource.h"
 #include "MCPResourceTemplate.h"
+#include "MCPPrompt.h"
 #include "MCPTransport.h"
 
-#define MCPD_VERSION "0.1.0"
+#define MCPD_VERSION "0.2.0"
 #define MCPD_MCP_PROTOCOL_VERSION "2025-03-26"
 
 namespace mcpd {
@@ -84,6 +85,17 @@ public:
 
     void addResourceTemplate(const MCPResourceTemplate& tmpl);
 
+    // ── Prompt registration ────────────────────────────────────────────
+
+    /**
+     * Register a prompt with arguments and a handler that returns messages.
+     */
+    void addPrompt(const char* name, const char* description,
+                   std::vector<MCPPromptArgument> arguments,
+                   MCPPromptHandler handler);
+
+    void addPrompt(const MCPPrompt& prompt);
+
     // ── Lifecycle ──────────────────────────────────────────────────────
 
     /**
@@ -133,6 +145,7 @@ private:
     std::vector<MCPTool> _tools;
     std::vector<MCPResource> _resources;
     std::vector<MCPResourceTemplate> _resourceTemplates;
+    std::vector<MCPPrompt> _prompts;
 
     // ── JSON-RPC dispatch ──────────────────────────────────────────────
 
@@ -151,6 +164,8 @@ private:
     String _handleResourcesList(JsonVariant params, JsonVariant id);
     String _handleResourcesRead(JsonVariant params, JsonVariant id);
     String _handleResourcesTemplatesList(JsonVariant params, JsonVariant id);
+    String _handlePromptsList(JsonVariant params, JsonVariant id);
+    String _handlePromptsGet(JsonVariant params, JsonVariant id);
     String _handlePing(JsonVariant id);
 
     // ── Helpers ────────────────────────────────────────────────────────

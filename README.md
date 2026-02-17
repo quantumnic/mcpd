@@ -39,7 +39,8 @@
 | Claude Desktop bridge | ✅ | ❌ | ❌ |
 | mDNS discovery | ✅ | ❌ | ❌ |
 | Resource Templates (RFC 6570) | ✅ | ❌ | ❌ |
-| Built-in tools (GPIO, I2C, Servo…) | ✅ 8 tools | ❌ | ❌ |
+| Built-in tools (GPIO, I2C, MQTT…) | ✅ 9 tools | ❌ | ❌ |
+| Prompts support | ✅ | ❌ | ❌ |
 | Authentication | ✅ | ❌ | ❌ |
 | OTA Updates | ✅ | ❌ | ❌ |
 | Prometheus Metrics | ✅ | ❌ | ❌ |
@@ -234,6 +235,32 @@ void loop() {
 
 Then: `pio run -t upload --upload-port my-device.local`
 
+### 💬 Prompts
+
+Expose reusable prompt templates that MCP clients can discover and use:
+
+```cpp
+#include <mcpd.h>
+
+mcp.addPrompt("diagnose_sensor",
+    "Diagnose a sensor issue",
+    {
+        mcpd::MCPPromptArgument("sensor_id", "Sensor to diagnose", true),
+        mcpd::MCPPromptArgument("symptom", "Observed symptom", false)
+    },
+    [](const std::map<String, String>& args) -> std::vector<mcpd::MCPPromptMessage> {
+        String sensor = args.at("sensor_id");
+        return {
+            mcpd::MCPPromptMessage("user",
+                (String("Please diagnose sensor '") + sensor +
+                 "'. Read its current value, check the last 5 readings, "
+                 "and tell me if anything looks wrong.").c_str())
+        };
+    });
+```
+
+Clients call `prompts/list` to discover available prompts and `prompts/get` to retrieve them with arguments filled in.
+
 ### 📊 Prometheus Metrics
 
 Monitor your device with `/metrics` endpoint:
@@ -269,14 +296,20 @@ mcpd ships with optional built-in tools:
 | **DHT** | `dht_read` (temperature & humidity) | DHT |
 | **WiFi** | `wifi_status`, `wifi_scan` | — |
 | **I2C** | `i2c_scan`, `i2c_read`, `i2c_write` | — |
+| **MQTT** | `mqtt_connect`, `mqtt_publish`, `mqtt_subscribe`, `mqtt_messages`, `mqtt_status` | PubSubClient |
 | **System** | `system_info` (heap, uptime, chip) | — |
 
 ```cpp
 #include <tools/MCPGPIOTool.h>
 #include <tools/MCPSystemTool.h>
+#include <tools/MCPMQTTTool.h>
 
 mcpd::tools::GPIOTool::attach(mcp);
 mcpd::tools::SystemTool::attach(mcp);
+
+mcpd::tools::MQTTTool mqtt;
+mqtt.attach(mcp);
+// In loop(): mqtt.loop();
 ```
 
 For full API documentation, see [docs/API.md](docs/API.md).
@@ -289,6 +322,7 @@ For full API documentation, see [docs/API.md](docs/API.md).
 | [`sensor_hub`](examples/sensor_hub/) | Multi-sensor setup with resources | ESP32 + sensors |
 | [`home_automation`](examples/home_automation/) | GPIO + MQTT home automation | ESP32 + relays |
 | [`weather_station`](examples/weather_station/) | Temperature, humidity, pressure as MCP resources | ESP32 + DHT22 + BMP280 |
+| [`mqtt_bridge`](examples/mqtt_bridge/) | MQTT pub/sub bridge — AI talks to IoT | ESP32 + MQTT broker |
 | [`robot_arm`](examples/robot_arm/) | Claude controls a 4-DOF servo robot arm | ESP32 + 4× servos |
 
 ## Supported Platforms
@@ -314,6 +348,7 @@ Implements [MCP specification 2025-03-26](https://modelcontextprotocol.io/specif
 - ✅ Streamable HTTP transport (POST + SSE)
 - ✅ Session management (`Mcp-Session-Id`)
 - ✅ mDNS service advertisement (`_mcp._tcp`)
+- ✅ `prompts/list` and `prompts/get`
 - ✅ Batch request support
 - ✅ CORS headers for browser clients
 
@@ -325,7 +360,7 @@ Test on macOS/Linux **without any hardware**:
 make test
 ```
 
-- **20 unit tests** — JSON-RPC parsing, dispatch, error handling, batch requests
+- **26 unit tests** — JSON-RPC parsing, dispatch, error handling, batch requests, prompts
 - **15 HTTP integration tests** — Real HTTP requests against a POSIX socket MCP server
 
 ## Roadmap
@@ -344,8 +379,8 @@ make test
 - [x] Interactive serial setup CLI
 - [x] Resource Templates (RFC 6570 Level 1)
 - [ ] RP2040 (Pico W) full platform testing
-- [ ] Built-in MQTT tool
-- [ ] Prompts support
+- [x] Built-in MQTT tool
+- [x] Prompts support
 - [ ] mTLS authentication
 
 ## License

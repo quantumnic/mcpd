@@ -52,6 +52,16 @@ void Server::addResourceTemplate(const MCPResourceTemplate& tmpl) {
     _resourceTemplates.push_back(tmpl);
 }
 
+void Server::addPrompt(const char* name, const char* description,
+                       std::vector<MCPPromptArgument> arguments,
+                       MCPPromptHandler handler) {
+    _prompts.emplace_back(name, description, std::move(arguments), handler);
+}
+
+void Server::addPrompt(const MCPPrompt& prompt) {
+    _prompts.push_back(prompt);
+}
+
 // ════════════════════════════════════════════════════════════════════════
 // Configuration
 // ════════════════════════════════════════════════════════════════════════
@@ -254,6 +264,8 @@ String Server::_dispatch(const char* method, JsonVariant params, JsonVariant id)
     if (m == "resources/list")   return _handleResourcesList(params, id);
     if (m == "resources/read")   return _handleResourcesRead(params, id);
     if (m == "resources/templates/list") return _handleResourcesTemplatesList(params, id);
+    if (m == "prompts/list")           return _handlePromptsList(params, id);
+    if (m == "prompts/get")            return _handlePromptsGet(params, id);
 
     // notifications/initialized — no response needed
     if (m == "notifications/initialized") return "";
@@ -286,6 +298,11 @@ String Server::_handleInitialize(JsonVariant params, JsonVariant id) {
     // Advertise resources capability
     if (!_resources.empty() || !_resourceTemplates.empty()) {
         capabilities["resources"].to<JsonObject>();
+    }
+
+    // Advertise prompts capability
+    if (!_prompts.empty()) {
+        capabilities["prompts"].to<JsonObject>();
     }
 
     String resultStr;
@@ -423,6 +440,68 @@ String Server::_handleResourcesTemplatesList(JsonVariant params, JsonVariant id)
     String resultStr;
     serializeJson(result, resultStr);
     return _jsonRpcResult(id, resultStr);
+}
+
+String Server::_handlePromptsList(JsonVariant params, JsonVariant id) {
+    JsonDocument result;
+    JsonArray prompts = result["prompts"].to<JsonArray>();
+
+    for (const auto& prompt : _prompts) {
+        JsonObject obj = prompts.add<JsonObject>();
+        prompt.toJson(obj);
+    }
+
+    String resultStr;
+    serializeJson(result, resultStr);
+    return _jsonRpcResult(id, resultStr);
+}
+
+String Server::_handlePromptsGet(JsonVariant params, JsonVariant id) {
+    const char* promptName = params["name"];
+    if (!promptName) {
+        return _jsonRpcError(id, -32602, "Missing prompt name");
+    }
+
+    for (const auto& prompt : _prompts) {
+        if (prompt.name == promptName) {
+            // Extract arguments from params
+            std::map<String, String> arguments;
+            JsonObject argsObj = params["arguments"].as<JsonObject>();
+            if (!argsObj.isNull()) {
+                for (JsonPair kv : argsObj) {
+                    arguments[String(kv.key().c_str())] = kv.value().as<String>();
+                }
+            }
+
+            // Check required arguments
+            for (const auto& argDef : prompt.arguments) {
+                if (argDef.required && arguments.find(argDef.name) == arguments.end()) {
+                    return _jsonRpcError(id, -32602,
+                        (String("Missing required argument: ") + argDef.name).c_str());
+                }
+            }
+
+            // Call the handler
+            std::vector<MCPPromptMessage> messages = prompt.handler(arguments);
+
+            // Build response
+            JsonDocument result;
+            result["description"] = prompt.description;
+            JsonArray msgsArr = result["messages"].to<JsonArray>();
+
+            for (const auto& msg : messages) {
+                JsonObject msgObj = msgsArr.add<JsonObject>();
+                msg.toJson(msgObj);
+            }
+
+            String resultStr;
+            serializeJson(result, resultStr);
+            return _jsonRpcResult(id, resultStr);
+        }
+    }
+
+    return _jsonRpcError(id, -32602,
+        (String("Prompt not found: ") + promptName).c_str());
 }
 
 // ════════════════════════════════════════════════════════════════════════
