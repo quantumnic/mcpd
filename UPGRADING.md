@@ -1,5 +1,41 @@
 # Upgrading mcpd
 
+## From 0.18.x to 0.19.0
+
+**No breaking changes.** Drop-in upgrade.
+
+### New tools (opt-in)
+
+```cpp
+#include <mcpd.h>
+#include <tools/MCPCameraTool.h>
+#include <tools/MCPESPNowTool.h>
+
+mcpd::Server mcp("my-device");
+
+// Camera (ESP32-CAM with AI-Thinker pinout)
+mcpd::addCameraTools(mcp);  // default pins
+// Or with custom pins:
+mcpd::CameraPins pins;
+pins.flash = 4;
+mcpd::addCameraTools(mcp, pins);
+
+// ESP-NOW peer-to-peer mesh
+mcpd::addESPNowTools(mcp);
+```
+
+### Camera workflow
+1. `camera_init` — initialize with resolution and quality
+2. `camera_capture` — take JPEG photos (with optional flash)
+3. `camera_configure` — adjust brightness, contrast, flip, effects
+4. Image data returned as base64-encoded JPEG
+
+### ESP-NOW workflow
+1. `espnow_init` — start ESP-NOW subsystem
+2. `espnow_add_peer` — register peers by MAC address
+3. `espnow_send` / `espnow_broadcast` — send up to 250 bytes
+4. `espnow_receive` — read incoming messages from buffer
+
 ## From 0.17.x to 0.18.0
 
 **No breaking changes.** Drop-in upgrade.

@@ -424,6 +424,160 @@ TEST(battery_history_returns_readings) {
     ASSERT_STR_CONTAINS(resp.c_str(), "count");
 }
 
+// ── Camera Tool Tests (non-ESP32 fallback) ─────────────────────────────
+
+#include "../src/tools/MCPCameraTool.h"
+
+TEST(camera_base64_encode_empty) {
+    uint8_t data[] = {};
+    String result = mcpd::_base64Encode(data, 0);
+    ASSERT_EQ(result.length(), (unsigned int)0);
+}
+
+TEST(camera_base64_encode_hello) {
+    const uint8_t data[] = {'H', 'e', 'l', 'l', 'o'};
+    String result = mcpd::_base64Encode(data, 5);
+    ASSERT(result == "SGVsbG8=");
+}
+
+TEST(camera_base64_encode_padding) {
+    const uint8_t data[] = {'A', 'B'};
+    String result = mcpd::_base64Encode(data, 2);
+    ASSERT(result == "QUI=");
+}
+
+TEST(camera_base64_encode_no_padding) {
+    const uint8_t data[] = {'A', 'B', 'C'};
+    String result = mcpd::_base64Encode(data, 3);
+    ASSERT(result == "QUJD");
+}
+
+TEST(camera_init_non_esp32_returns_error) {
+    auto* s = makeServer();
+    mcpd::addCameraTools(*s);
+    String resp = call(s, "camera_init", R"({"resolution":"VGA"})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "only supported on ESP32");
+}
+
+TEST(camera_capture_non_esp32_returns_error) {
+    auto* s = makeServer();
+    mcpd::addCameraTools(*s);
+    String resp = call(s, "camera_capture", R"({"flash":false})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "only supported on ESP32");
+}
+
+TEST(camera_status_non_esp32_returns_error) {
+    auto* s = makeServer();
+    mcpd::addCameraTools(*s);
+    String resp = call(s, "camera_status", R"({})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "only supported on ESP32");
+}
+
+TEST(camera_configure_non_esp32_returns_error) {
+    auto* s = makeServer();
+    mcpd::addCameraTools(*s);
+    String resp = call(s, "camera_configure", R"({"brightness":1})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "only supported on ESP32");
+}
+
+TEST(camera_flash_non_esp32_returns_error) {
+    auto* s = makeServer();
+    mcpd::addCameraTools(*s);
+    String resp = call(s, "camera_flash", R"({"on":true})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "only supported on ESP32");
+}
+
+TEST(camera_tools_register_all_five) {
+    auto* s = makeServer();
+    mcpd::addCameraTools(*s);
+    String req = R"({"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}})";
+    String resp = s->_processJsonRpc(req);
+    ASSERT_STR_CONTAINS(resp.c_str(), "camera_init");
+    ASSERT_STR_CONTAINS(resp.c_str(), "camera_capture");
+    ASSERT_STR_CONTAINS(resp.c_str(), "camera_status");
+    ASSERT_STR_CONTAINS(resp.c_str(), "camera_configure");
+    ASSERT_STR_CONTAINS(resp.c_str(), "camera_flash");
+}
+
+// ── ESP-NOW Tool Tests (non-ESP32 fallback) ────────────────────────────
+
+#include "../src/tools/MCPESPNowTool.h"
+
+TEST(espnow_mac_to_string) {
+    uint8_t mac[6] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF};
+    String result = mcpd::_macToString(mac);
+    ASSERT(result == "AA:BB:CC:DD:EE:FF");
+}
+
+TEST(espnow_parse_mac_valid) {
+    uint8_t mac[6] = {};
+    bool ok = mcpd::_parseMac("AA:BB:CC:DD:EE:FF", mac);
+    ASSERT(ok);
+    ASSERT_EQ(mac[0], (uint8_t)0xAA);
+    ASSERT_EQ(mac[5], (uint8_t)0xFF);
+}
+
+TEST(espnow_parse_mac_invalid) {
+    uint8_t mac[6] = {};
+    bool ok = mcpd::_parseMac("not-a-mac", mac);
+    ASSERT(!ok);
+}
+
+TEST(espnow_init_non_esp32_returns_error) {
+    auto* s = makeServer();
+    mcpd::addESPNowTools(*s);
+    String resp = call(s, "espnow_init", R"({})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "only supported on ESP32");
+}
+
+TEST(espnow_send_non_esp32_returns_error) {
+    auto* s = makeServer();
+    mcpd::addESPNowTools(*s);
+    String resp = call(s, "espnow_send", R"({"mac":"AA:BB:CC:DD:EE:FF","data":"hello"})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "only supported on ESP32");
+}
+
+TEST(espnow_receive_non_esp32_returns_error) {
+    auto* s = makeServer();
+    mcpd::addESPNowTools(*s);
+    String resp = call(s, "espnow_receive", R"({})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "only supported on ESP32");
+}
+
+TEST(espnow_peers_non_esp32_returns_error) {
+    auto* s = makeServer();
+    mcpd::addESPNowTools(*s);
+    String resp = call(s, "espnow_peers", R"({})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "only supported on ESP32");
+}
+
+TEST(espnow_broadcast_non_esp32_returns_error) {
+    auto* s = makeServer();
+    mcpd::addESPNowTools(*s);
+    String resp = call(s, "espnow_broadcast", R"({"data":"hello all"})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "only supported on ESP32");
+}
+
+TEST(espnow_add_peer_non_esp32_returns_error) {
+    auto* s = makeServer();
+    mcpd::addESPNowTools(*s);
+    String resp = call(s, "espnow_add_peer", R"({"mac":"AA:BB:CC:DD:EE:FF"})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "only supported on ESP32");
+}
+
+TEST(espnow_tools_register_all_six) {
+    auto* s = makeServer();
+    mcpd::addESPNowTools(*s);
+    String req = R"({"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}})";
+    String resp = s->_processJsonRpc(req);
+    ASSERT_STR_CONTAINS(resp.c_str(), "espnow_init");
+    ASSERT_STR_CONTAINS(resp.c_str(), "espnow_add_peer");
+    ASSERT_STR_CONTAINS(resp.c_str(), "espnow_send");
+    ASSERT_STR_CONTAINS(resp.c_str(), "espnow_receive");
+    ASSERT_STR_CONTAINS(resp.c_str(), "espnow_peers");
+    ASSERT_STR_CONTAINS(resp.c_str(), "espnow_broadcast");
+}
+
 // ── Main ───────────────────────────────────────────────────────────────
 
 int main() {

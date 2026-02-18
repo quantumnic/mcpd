@@ -2,6 +2,43 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.19.0] - 2026-02-18
+
+### Added
+- **Camera Tool** (`tools/MCPCameraTool.h`) — ESP32-CAM image capture via MCP:
+  - `camera_init` — initialize camera with configurable resolution (QQVGA to UXGA), quality, and pin mapping
+  - `camera_capture` — take a JPEG photo, returns base64-encoded image data with optional flash control
+  - `camera_status` — full sensor info (brightness, contrast, saturation, gain, exposure, white balance, etc.)
+  - `camera_configure` — adjust sensor settings: resolution, quality, brightness, contrast, saturation, sharpness, mirror, flip, special effects
+  - `camera_flash` — control onboard LED flash with on/off toggle or PWM brightness (0-255)
+  - Supports AI-Thinker ESP32-CAM, ESP32-S3-EYE, XIAO ESP32S3 Sense (configurable pins)
+  - Built-in base64 encoder for image data
+  - `addCameraTools(server, pins)` — single-call registration
+- **ESP-NOW Tool** (`tools/MCPESPNowTool.h`) — peer-to-peer mesh communication:
+  - `espnow_init` — initialize ESP-NOW subsystem with optional WiFi channel selection
+  - `espnow_add_peer` — register a peer by MAC address with optional encryption
+  - `espnow_send` — send up to 250 bytes to a specific peer
+  - `espnow_receive` — read received messages from ring buffer (32-message capacity)
+  - `espnow_peers` — list peers with delivery statistics (sent/delivered/failed/rate)
+  - `espnow_broadcast` — send to all peers via broadcast address (FF:FF:FF:FF:FF:FF)
+  - ISR-safe ring buffer for received messages
+  - Delivery callback tracking per peer
+  - `addESPNowTools(server)` — single-call registration
+- **Wireless Camera Example** (`examples/wireless_camera/`) — demonstrates:
+  - ESP32-CAM as MCP server with full camera control
+  - ESP-NOW mesh for coordination with other MCUs
+  - AI-guided security monitoring prompt
+  - Camera status resource
+- 20 new unit tests:
+  - Camera tools: base64 encoding (4), non-ESP32 fallback (5), registration (1)
+  - ESP-NOW tools: MAC parsing/formatting (3), non-ESP32 fallback (6), registration (1)
+- Build system: `test_tools` now included in native test suite (`test/native/Makefile`)
+
+### Changed
+- Bumped version to 0.19.0
+- Total test count: **285** (222 JSON-RPC + 48 tool tests + 15 HTTP integration)
+- Total built-in tools: **125** (114 + 5 Camera + 6 ESP-NOW)
+
 ## [0.18.0] - 2026-02-18
 
 ### Added
