@@ -33,7 +33,7 @@
 |---|:---:|:---:|:---:|
 | Runs on the MCU | ✅ | ✅ | ❌ CLI tool |
 | MCP spec compliant | ✅ 2025-03-26 | ❌ custom WS | ❌ |
-| Actually compiles | ✅ 77 tests | ❌ self-described | N/A |
+| Actually compiles | ✅ 96 tests | ❌ self-described | N/A |
 | Streamable HTTP + SSE | ✅ | ❌ | ❌ |
 | WebSocket transport | ✅ | ✅ | ❌ |
 | Claude Desktop bridge | ✅ | ❌ | ❌ |
@@ -41,6 +41,9 @@
 | Resource Templates (RFC 6570) | ✅ | ❌ | ❌ |
 | Built-in tools (GPIO, I2C, SPI, ADC, UART, Power, Timer…) | ✅ 22 tools | ❌ | ❌ |
 | Tool Annotations (readOnly, destructive hints) | ✅ | ❌ | ❌ |
+| Structured Content (text, image, resource) | ✅ | ❌ | ❌ |
+| Progress Notifications | ✅ | ❌ | ❌ |
+| Request Cancellation | ✅ | ❌ | ❌ |
 | Prompts support | ✅ | ❌ | ❌ |
 | Authentication | ✅ | ❌ | ❌ |
 | OTA Updates | ✅ | ❌ | ❌ |

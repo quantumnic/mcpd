@@ -64,7 +64,7 @@ public:
 
                 if (args["hex"].is<const char*>()) {
                     // Send hex-encoded binary data
-                    String hex = args["hex"].as<String>();
+                    String hex = args["hex"].as<const char*>();
                     for (size_t i = 0; i + 1 < hex.length(); i += 2) {
                         char hi = hex[i], lo = hex[i + 1];
                         auto hexVal = [](char c) -> uint8_t {
@@ -78,7 +78,7 @@ public:
                         written++;
                     }
                 } else if (args["data"].is<const char*>()) {
-                    String data = args["data"].as<String>();
+                    String data = args["data"].as<const char*>();
                     written = serial->print(data);
                     if (args["newline"] | false) {
                         serial->print("\r\n");

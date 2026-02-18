@@ -32,6 +32,15 @@ void Server::addTool(const MCPTool& tool) {
     _tools.push_back(tool);
 }
 
+void Server::addRichTool(const char* name, const char* description,
+                         const char* inputSchemaJson, MCPRichToolHandler handler) {
+    // Register as a normal tool with a wrapper handler
+    _tools.emplace_back(name, description, inputSchemaJson,
+        [](const JsonObject&) -> String { return "{}"; });  // placeholder
+    // Store the rich handler separately
+    _richTools.emplace_back(String(name), handler);
+}
+
 void Server::addResource(const char* uri, const char* name,
                          const char* description, const char* mimeType,
                          MCPResourceHandler handler) {
@@ -325,8 +334,18 @@ String Server::_dispatch(const char* method, JsonVariant params, JsonVariant id)
 
     // notifications/initialized — no response needed
     if (m == "notifications/initialized") return "";
-    // notifications/cancelled — acknowledge gracefully
-    if (m == "notifications/cancelled") return "";
+    // notifications/cancelled — cancel in-flight request
+    if (m == "notifications/cancelled") {
+        if (!params.isNull()) {
+            const char* rid = params["requestId"].as<const char*>();
+            String reqId = rid ? rid : "";
+            if (!reqId.isEmpty()) {
+                _requestTracker.cancelRequest(reqId);
+                Serial.printf("[mcpd] Request cancelled: %s\n", reqId.c_str());
+            }
+        }
+        return "";
+    }
 
     return _jsonRpcError(id, -32601, "Method not found");
 }
@@ -423,35 +442,88 @@ String Server::_handleToolsCall(JsonVariant params, JsonVariant id) {
         return _jsonRpcError(id, -32602, "Missing tool name");
     }
 
+    // Extract progress token from _meta if present
+    String progressToken;
+    if (!params["_meta"].isNull() && !params["_meta"]["progressToken"].isNull()) {
+        const char* pt = params["_meta"]["progressToken"].as<const char*>();
+        if (pt) progressToken = pt;
+    }
+
+    // Track the request for cancellation support
+    String requestId;
+    if (!id.isNull()) {
+        if (id.is<const char*>()) {
+            requestId = id.as<const char*>();
+        } else {
+            requestId = String(id.as<long>());
+        }
+    }
+    if (!requestId.isEmpty()) {
+        _requestTracker.trackRequest(requestId, progressToken);
+    }
+
     // Find the tool
     for (const auto& tool : _tools) {
         if (tool.name == toolName) {
             JsonObject arguments = params["arguments"].as<JsonObject>();
 
-            // Call the handler with error catching
-            String handlerResult;
-            bool isError = false;
-            try {
-                handlerResult = tool.handler(arguments);
-            } catch (...) {
-                handlerResult = "Internal tool error";
-                isError = true;
-            }
-
-            // Build MCP result with content array
-            JsonDocument result;
-            JsonArray content = result["content"].to<JsonArray>();
-            JsonObject textContent = content.add<JsonObject>();
-            textContent["type"] = "text";
-            textContent["text"] = handlerResult;
-            if (isError) {
-                result["isError"] = true;
+            // Check if this tool has a rich handler
+            MCPRichToolHandler richHandler = nullptr;
+            for (const auto& rh : _richTools) {
+                if (rh.first == toolName) {
+                    richHandler = rh.second;
+                    break;
+                }
             }
 
             String resultStr;
-            serializeJson(result, resultStr);
+
+            if (richHandler) {
+                // Use rich handler for structured content
+                MCPToolResult toolResult;
+                try {
+                    toolResult = richHandler(arguments);
+                } catch (...) {
+                    toolResult = MCPToolResult::error("Internal tool error");
+                }
+
+                JsonDocument result;
+                JsonObject resultObj = result.to<JsonObject>();
+                toolResult.toJson(resultObj);
+                serializeJson(result, resultStr);
+            } else {
+                // Use simple handler (backward compatible)
+                String handlerResult;
+                bool isError = false;
+                try {
+                    handlerResult = tool.handler(arguments);
+                } catch (...) {
+                    handlerResult = "Internal tool error";
+                    isError = true;
+                }
+
+                JsonDocument result;
+                JsonArray content = result["content"].to<JsonArray>();
+                JsonObject textContent = content.add<JsonObject>();
+                textContent["type"] = "text";
+                textContent["text"] = handlerResult;
+                if (isError) {
+                    result["isError"] = true;
+                }
+                serializeJson(result, resultStr);
+            }
+
+            // Complete request tracking
+            if (!requestId.isEmpty()) {
+                _requestTracker.completeRequest(requestId);
+            }
+
             return _jsonRpcResult(id, resultStr);
         }
+    }
+
+    if (!requestId.isEmpty()) {
+        _requestTracker.completeRequest(requestId);
     }
 
     return _jsonRpcError(id, -32602,
@@ -591,7 +663,8 @@ String Server::_handlePromptsGet(JsonVariant params, JsonVariant id) {
             JsonObject argsObj = params["arguments"].as<JsonObject>();
             if (!argsObj.isNull()) {
                 for (JsonPair kv : argsObj) {
-                    arguments[String(kv.key().c_str())] = kv.value().as<String>();
+                    const char* val = kv.value().as<const char*>();
+                    arguments[String(kv.key().c_str())] = val ? val : "";
                 }
             }
 
@@ -761,6 +834,22 @@ String Server::_handleRootsList(JsonVariant params, JsonVariant id) {
     String resultStr;
     serializeJson(result, resultStr);
     return _jsonRpcResult(id, resultStr);
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// Progress Notifications
+// ════════════════════════════════════════════════════════════════════════
+
+void Server::reportProgress(const String& progressToken, double progress,
+                            double total, const String& message) {
+    if (progressToken.isEmpty()) return;
+
+    ProgressNotification pn;
+    pn.progressToken = progressToken;
+    pn.progress = progress;
+    pn.total = total;
+    pn.message = message;
+    _pendingNotifications.push_back(pn.toJsonRpc());
 }
 
 // ════════════════════════════════════════════════════════════════════════

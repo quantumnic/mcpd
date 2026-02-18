@@ -26,9 +26,11 @@
 #include "MCPLogging.h"
 #include "MCPCompletion.h"
 #include "MCPRoots.h"
+#include "MCPContent.h"
+#include "MCPProgress.h"
 #include "MCPTransport.h"
 
-#define MCPD_VERSION "0.6.0"
+#define MCPD_VERSION "0.7.0"
 #define MCPD_MCP_PROTOCOL_VERSION "2025-03-26"
 
 namespace mcpd {
@@ -64,6 +66,13 @@ public:
      * Register a tool with a pre-built MCPTool object.
      */
     void addTool(const MCPTool& tool);
+
+    /**
+     * Register a tool with a rich handler that returns structured content
+     * (images, embedded resources, multi-part responses).
+     */
+    void addRichTool(const char* name, const char* description,
+                     const char* inputSchemaJson, MCPRichToolHandler handler);
 
     // ── Resource registration ──────────────────────────────────────────
 
@@ -144,6 +153,19 @@ public:
     /** Access the completion manager for registering autocomplete providers */
     CompletionManager& completions() { return _completions; }
 
+    /** Access the request tracker for cancellation checking */
+    RequestTracker& requests() { return _requestTracker; }
+
+    /**
+     * Report progress for a long-running tool.
+     * @param progressToken  Token from the original request's _meta.progressToken
+     * @param progress       Current progress value
+     * @param total          Total expected value (0 = indeterminate)
+     * @param message        Optional human-readable status message
+     */
+    void reportProgress(const String& progressToken, double progress,
+                        double total = 0, const String& message = "");
+
     // ── Resource Subscriptions ─────────────────────────────────────────
 
     /**
@@ -197,8 +219,10 @@ private:
     WebServer* _httpServer = nullptr;
     Logging _logging;
     CompletionManager _completions;
+    RequestTracker _requestTracker;
 
     std::vector<MCPTool> _tools;
+    std::vector<std::pair<String, MCPRichToolHandler>> _richTools;  // name → handler
     std::vector<MCPResource> _resources;
     std::vector<MCPResourceTemplate> _resourceTemplates;
     std::vector<MCPPrompt> _prompts;

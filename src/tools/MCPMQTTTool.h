@@ -234,7 +234,7 @@ private:
     // ── Tool implementations ───────────────────────────────────────────
 
     String _connect(const JsonObject& args) {
-        _brokerHost = args["host"].as<String>();
+        _brokerHost = args["host"].as<const char*>();
         _brokerPort = args["port"] | 1883;
         _clientId = args["client_id"] | String("mcpd-") + String(random(10000));
 

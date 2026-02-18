@@ -21,7 +21,7 @@ public:
                 R"j({"type":"object","properties":{"pin":{"type":"integer","description":"GPIO pin number"},"mode":{"type":"string","enum":["INPUT","OUTPUT","INPUT_PULLUP","INPUT_PULLDOWN"],"description":"Pin mode"}},"required":["pin","mode"]})j",
                 [](const JsonObject& args) -> String {
                     int pin = args["pin"];
-                    String mode = args["mode"].as<String>();
+                    String mode = args["mode"].as<const char*>();
                     if (mode == "INPUT") pinMode(pin, INPUT);
                     else if (mode == "OUTPUT") pinMode(pin, OUTPUT);
                     else if (mode == "INPUT_PULLUP") pinMode(pin, INPUT_PULLUP);

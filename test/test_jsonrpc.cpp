@@ -12,6 +12,8 @@
 #include "../src/mcpd.h"
 #include "../src/mcpd.cpp"
 #include "../src/tools/MCPGPIOTool.h"
+#include "../src/MCPContent.h"
+#include "../src/MCPProgress.h"
 
 using namespace mcpd;
 
@@ -703,11 +705,11 @@ TEST(pagination_resources) {
     ASSERT_STR_CONTAINS(resp.c_str(), "\"nextCursor\"");
 }
 
-TEST(version_is_0_6_0) {
+TEST(version_is_0_7_0) {
     auto* s = makeTestServer();
     String req = R"({"jsonrpc":"2.0","id":250,"method":"initialize","params":{}})";
     String resp = s->_processJsonRpc(req);
-    ASSERT_STR_CONTAINS(resp.c_str(), "\"version\":\"0.6.0\"");
+    ASSERT_STR_CONTAINS(resp.c_str(), "\"version\":\"0.7.0\"");
 }
 
 // ── v0.6.0 Tests: Tool Annotations ────────────────────────────────────
@@ -853,6 +855,228 @@ TEST(cancellation_in_batch) {
     String req = R"([{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":"x"}},{"jsonrpc":"2.0","id":330,"method":"ping"}])";
     String resp = s->_processJsonRpc(req);
     ASSERT_STR_CONTAINS(resp.c_str(), "\"id\":330");
+}
+
+// ── v0.7.0 Tests: Structured Content Types ────────────────────────────
+
+TEST(content_text_factory) {
+    auto c = MCPContent::makeText("hello world");
+    ASSERT(c.type == MCPContent::TEXT);
+    ASSERT(c.text == "hello world");
+}
+
+TEST(content_image_factory) {
+    auto c = MCPContent::makeImage("iVBOR...", "image/png");
+    ASSERT(c.type == MCPContent::IMAGE);
+    ASSERT(c.data == "iVBOR...");
+    ASSERT(c.mimeType == "image/png");
+}
+
+TEST(content_resource_factory) {
+    auto c = MCPContent::makeResource("sensor://temp", "application/json", "{\"value\":22}");
+    ASSERT(c.type == MCPContent::RESOURCE);
+    ASSERT(c.uri == "sensor://temp");
+    ASSERT(c.text == "{\"value\":22}");
+}
+
+TEST(content_resource_blob_factory) {
+    auto c = MCPContent::makeResourceBlob("file://data.bin", "application/octet-stream", "AQID");
+    ASSERT(c.type == MCPContent::RESOURCE);
+    ASSERT(!c.blob.isEmpty());
+}
+
+TEST(tool_result_text) {
+    auto r = MCPToolResult::text("{\"ok\":true}");
+    ASSERT(r.content.size() == 1);
+    ASSERT(!r.isError);
+}
+
+TEST(tool_result_error) {
+    auto r = MCPToolResult::error("Something broke");
+    ASSERT(r.isError);
+    ASSERT(r.content[0].text == "Something broke");
+}
+
+TEST(tool_result_image) {
+    auto r = MCPToolResult::image("base64data", "image/jpeg", "A photo");
+    ASSERT(r.content.size() == 2);  // alt text + image
+    ASSERT(r.content[0].type == MCPContent::TEXT);
+    ASSERT(r.content[1].type == MCPContent::IMAGE);
+}
+
+TEST(content_text_to_json) {
+    auto c = MCPContent::makeText("test");
+    JsonDocument doc;
+    JsonObject obj = doc.to<JsonObject>();
+    c.toJson(obj);
+    ASSERT(String(obj["type"].as<const char*>()) == "text");
+    ASSERT(String(obj["text"].as<const char*>()) == "test");
+}
+
+TEST(content_image_to_json) {
+    auto c = MCPContent::makeImage("b64", "image/png");
+    JsonDocument doc;
+    JsonObject obj = doc.to<JsonObject>();
+    c.toJson(obj);
+    ASSERT(String(obj["type"].as<const char*>()) == "image");
+    ASSERT(String(obj["data"].as<const char*>()) == "b64");
+    ASSERT(String(obj["mimeType"].as<const char*>()) == "image/png");
+}
+
+TEST(content_resource_to_json) {
+    auto c = MCPContent::makeResource("sensor://x", "text/plain", "42");
+    JsonDocument doc;
+    JsonObject obj = doc.to<JsonObject>();
+    c.toJson(obj);
+    ASSERT(String(obj["type"].as<const char*>()) == "resource");
+    ASSERT(String(obj["resource"]["uri"].as<const char*>()) == "sensor://x");
+    ASSERT(String(obj["resource"]["text"].as<const char*>()) == "42");
+}
+
+TEST(content_resource_blob_to_json) {
+    auto c = MCPContent::makeResourceBlob("file://x", "application/octet-stream", "AQID");
+    JsonDocument doc;
+    JsonObject obj = doc.to<JsonObject>();
+    c.toJson(obj);
+    ASSERT(String(obj["resource"]["blob"].as<const char*>()) == "AQID");
+    ASSERT(obj["resource"]["text"].isNull());
+}
+
+TEST(tool_result_to_json) {
+    MCPToolResult r;
+    r.add(MCPContent::makeText("Reading: 22.5°C"));
+    r.add(MCPContent::makeImage("chart_b64", "image/png"));
+    JsonDocument doc;
+    JsonObject docObj = doc.to<JsonObject>();
+    r.toJson(docObj);
+    JsonArray arr = doc["content"].as<JsonArray>();
+    ASSERT(arr.size() == 2);
+    ASSERT(String(arr[0]["type"].as<const char*>()) == "text");
+    ASSERT(String(arr[1]["type"].as<const char*>()) == "image");
+}
+
+// ── v0.7.0 Tests: Rich Tool Handler ──────────────────────────────────
+
+TEST(rich_tool_call) {
+    Server* s = new Server("rich-test", 8080);
+    s->addRichTool("camera_snap", "Take a photo",
+        R"({"type":"object","properties":{"resolution":{"type":"string"}},"required":[]})",
+        [](const JsonObject& args) -> MCPToolResult {
+            MCPToolResult r;
+            r.add(MCPContent::makeText("Photo captured"));
+            r.add(MCPContent::makeImage("fakebase64imagedata", "image/jpeg"));
+            return r;
+        });
+
+    String req = R"({"jsonrpc":"2.0","id":700,"method":"tools/call","params":{"name":"camera_snap","arguments":{}}})";
+    String resp = s->_processJsonRpc(req);
+    ASSERT_STR_CONTAINS(resp.c_str(), "\"type\":\"image\"");
+    ASSERT_STR_CONTAINS(resp.c_str(), "fakebase64imagedata");
+    ASSERT_STR_CONTAINS(resp.c_str(), "Photo captured");
+    delete s;
+}
+
+TEST(rich_tool_error_result) {
+    Server* s = new Server("rich-err-test", 8080);
+    s->addRichTool("failing_tool", "Always fails",
+        R"({"type":"object","properties":{}})",
+        [](const JsonObject&) -> MCPToolResult {
+            return MCPToolResult::error("Sensor disconnected");
+        });
+
+    String req = R"({"jsonrpc":"2.0","id":701,"method":"tools/call","params":{"name":"failing_tool","arguments":{}}})";
+    String resp = s->_processJsonRpc(req);
+    ASSERT_STR_CONTAINS(resp.c_str(), "\"isError\":true");
+    ASSERT_STR_CONTAINS(resp.c_str(), "Sensor disconnected");
+    delete s;
+}
+
+// ── v0.7.0 Tests: Progress Notifications ─────────────────────────────
+
+TEST(progress_notification_json) {
+    ProgressNotification pn;
+    pn.progressToken = "tok-42";
+    pn.progress = 50;
+    pn.total = 100;
+    pn.message = "Halfway there";
+    String json = pn.toJsonRpc();
+    ASSERT_STR_CONTAINS(json.c_str(), "notifications/progress");
+    ASSERT_STR_CONTAINS(json.c_str(), "tok-42");
+    ASSERT_STR_CONTAINS(json.c_str(), "Halfway there");
+}
+
+TEST(progress_notification_no_total) {
+    ProgressNotification pn;
+    pn.progressToken = "tok";
+    pn.progress = 3;
+    pn.total = 0;
+    String json = pn.toJsonRpc();
+    ASSERT_STR_CONTAINS(json.c_str(), "\"progress\":3");
+    // total should not appear when 0
+    // (ArduinoJson won't serialize a field we didn't add)
+}
+
+TEST(report_progress_queues_notification) {
+    Server* s = new Server("prog-test", 8080);
+    s->reportProgress("my-token", 25, 100, "Quarter done");
+    // Check that a notification was queued
+    ASSERT(s->_pendingNotifications.size() == 1);
+    ASSERT_STR_CONTAINS(s->_pendingNotifications[0].c_str(), "my-token");
+    ASSERT_STR_CONTAINS(s->_pendingNotifications[0].c_str(), "Quarter done");
+    delete s;
+}
+
+TEST(report_progress_empty_token_noop) {
+    Server* s = new Server("prog-noop", 8080);
+    s->reportProgress("", 50, 100);
+    ASSERT(s->_pendingNotifications.size() == 0);
+    delete s;
+}
+
+// ── v0.7.0 Tests: Request Tracker / Cancellation ─────────────────────
+
+TEST(request_tracker_basic) {
+    RequestTracker rt;
+    rt.trackRequest("req-1", "prog-1");
+    ASSERT(rt.hasInFlight());
+    ASSERT(rt.inFlightCount() == 1);
+    rt.completeRequest("req-1");
+    ASSERT(!rt.hasInFlight());
+}
+
+TEST(request_tracker_cancel) {
+    RequestTracker rt;
+    rt.trackRequest("req-2");
+    ASSERT(rt.cancelRequest("req-2"));
+    ASSERT(rt.isCancelled("req-2"));
+    ASSERT(!rt.hasInFlight());
+}
+
+TEST(request_tracker_cancel_unknown) {
+    RequestTracker rt;
+    ASSERT(!rt.cancelRequest("nonexistent"));
+}
+
+TEST(cancellation_via_notification) {
+    auto* s = makeTestServer();
+    // Simulate tracking a request
+    s->requests().trackRequest("req-42", "pt-42");
+    ASSERT(s->requests().hasInFlight());
+
+    // Send cancellation notification
+    String cancel = R"({"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":"req-42"}})";
+    s->_processJsonRpc(cancel);
+    ASSERT(s->requests().isCancelled("req-42"));
+    ASSERT(!s->requests().hasInFlight());
+}
+
+TEST(progress_token_extraction_in_tools_call) {
+    auto* s = makeTestServer();
+    String req = R"({"jsonrpc":"2.0","id":710,"method":"tools/call","params":{"name":"echo","arguments":{"message":"hi"},"_meta":{"progressToken":"pt-710"}}})";
+    String resp = s->_processJsonRpc(req);
+    ASSERT_STR_CONTAINS(resp.c_str(), "\\\"echo\\\":\\\"hi\\\"");
+    // Request should be completed (not in-flight)
+    ASSERT(!s->requests().hasInFlight());
 }
 
 // ── Main ───────────────────────────────────────────────────────────────

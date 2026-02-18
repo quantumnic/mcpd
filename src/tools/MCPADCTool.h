@@ -122,7 +122,7 @@ public:
                 String result = "{\"pin\":" + String(pin);
 
                 if (args["attenuation"].is<const char*>()) {
-                    String atten = args["attenuation"].as<String>();
+                    String atten = args["attenuation"].as<const char*>();
                     if (atten == "0dB")        analogSetPinAttenuation(pin, ADC_0db);
                     else if (atten == "2.5dB")  analogSetPinAttenuation(pin, ADC_2_5db);
                     else if (atten == "6dB")    analogSetPinAttenuation(pin, ADC_6db);

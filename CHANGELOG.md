@@ -2,6 +2,41 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.0] - 2026-02-18
+
+### Added
+- **Structured Content Types** (`MCPContent.h`) — rich tool responses beyond plain text:
+  - `MCPContent::makeText()` — text content
+  - `MCPContent::makeImage()` — base64-encoded image content with MIME type
+  - `MCPContent::makeResource()` — embedded resource content (text)
+  - `MCPContent::makeResourceBlob()` — embedded resource content (binary/base64)
+  - `MCPToolResult` — multi-part tool results combining text, images, and resources
+  - `MCPToolResult::text()`, `::error()`, `::image()` convenience factories
+- **Rich Tool Handler** (`MCPRichToolHandler`) — new handler type for tools returning structured content:
+  - `server.addRichTool(name, desc, schema, handler)` — register tools that return `MCPToolResult`
+  - Backward-compatible: existing `addTool()` with string handlers still works unchanged
+- **Progress Notifications** (`MCPProgress.h`) — MCP `notifications/progress` support:
+  - `server.reportProgress(token, progress, total, message)` — report progress for long-running tools
+  - Progress token extraction from `_meta.progressToken` in `tools/call` requests
+  - `ProgressNotification` struct with JSON-RPC serialization
+- **Request Cancellation** — proper `notifications/cancelled` handling:
+  - `RequestTracker` class for tracking in-flight requests
+  - `server.requests()` accessor for cancellation checking in tool handlers
+  - Cancelled requests are tracked and queryable via `isCancelled(requestId)`
+- 8 new unit tests for structured content (factories, serialization, JSON output)
+- 2 new unit tests for rich tool handler (call, error result)
+- 4 new unit tests for progress notifications (JSON, no-total, queue, empty-token)
+- 4 new unit tests for request tracking/cancellation (basic, cancel, unknown, via notification)
+- 1 new unit test for progress token extraction in tools/call
+- Fixed pre-existing compilation issue with `as<String>()` in tool handlers (replaced with `as<const char*>()`)
+
+### Changed
+- Bumped version to 0.7.0
+- Total tests: 88 → 96 (19 new tests)
+- `_handleToolsCall` now extracts `_meta.progressToken` and tracks requests
+- `notifications/cancelled` now properly cancels tracked in-flight requests
+- Fixed `_handlePromptsGet` and built-in tool handlers to use `as<const char*>()` for ArduinoJson v7 compatibility
+
 ## [0.6.0] - 2026-02-18
 
 ### Added
