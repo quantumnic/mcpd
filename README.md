@@ -441,6 +441,10 @@ make test
 - [ ] RP2040 (Pico W) full platform testing
 - [x] Built-in MQTT tool
 - [x] Prompts support
+- [x] BLE transport (ESP32)
+- [x] Rate limiting
+- [x] Connection lifecycle hooks
+- [x] Watchdog tool
 - [ ] mTLS authentication
 
 ## Testing

@@ -15,6 +15,8 @@
 #include "../src/MCPContent.h"
 #include "../src/MCPProgress.h"
 #include "../src/MCPElicitation.h"
+#include "../src/MCPRateLimit.h"
+#include "../src/tools/MCPWatchdogTool.h"
 
 using namespace mcpd;
 
@@ -706,11 +708,11 @@ TEST(pagination_resources) {
     ASSERT_STR_CONTAINS(resp.c_str(), "\"nextCursor\"");
 }
 
-TEST(version_is_0_9_0) {
+TEST(version_is_0_10_0_compat) {
     auto* s = makeTestServer();
     String req = R"({"jsonrpc":"2.0","id":250,"method":"initialize","params":{}})";
     String resp = s->_processJsonRpc(req);
-    ASSERT_STR_CONTAINS(resp.c_str(), "\"version\":\"0.9.0\"");
+    ASSERT_STR_CONTAINS(resp.c_str(), "\"version\":\"0.10.0\"");
 }
 
 // ── v0.6.0 Tests: Tool Annotations ────────────────────────────────────
@@ -1452,6 +1454,138 @@ TEST(audio_tool_result_no_description) {
     MCPToolResult result = MCPToolResult::audio("AQID", "audio/wav");
     ASSERT_EQ(result.content.size(), (size_t)1);
     ASSERT_EQ((int)result.content[0].type, (int)MCPContent::AUDIO);
+}
+
+// ── Rate Limiter Tests ─────────────────────────────────────────────────
+
+TEST(rate_limiter_default_disabled) {
+    RateLimiter rl;
+    ASSERT(!rl.isEnabled());
+    ASSERT(rl.tryAcquire());  // always allows when disabled
+}
+
+TEST(rate_limiter_configure) {
+    RateLimiter rl;
+    rl.configure(10.0, 5);
+    ASSERT(rl.isEnabled());
+    ASSERT_EQ(rl.requestsPerSecond(), 10.0f);
+    ASSERT_EQ(rl.burstCapacity(), (size_t)5);
+}
+
+TEST(rate_limiter_burst_capacity) {
+    RateLimiter rl;
+    rl.configure(1.0, 3);  // 1/sec, burst of 3
+    // Should allow 3 requests (burst), then deny
+    ASSERT(rl.tryAcquire());
+    ASSERT(rl.tryAcquire());
+    ASSERT(rl.tryAcquire());
+    ASSERT(!rl.tryAcquire());  // 4th should fail
+}
+
+TEST(rate_limiter_stats) {
+    RateLimiter rl;
+    rl.configure(1.0, 2);
+    rl.tryAcquire();  // allowed
+    rl.tryAcquire();  // allowed
+    rl.tryAcquire();  // denied
+    ASSERT_EQ(rl.totalAllowed(), 2UL);
+    ASSERT_EQ(rl.totalDenied(), 1UL);
+}
+
+TEST(rate_limiter_disable) {
+    RateLimiter rl;
+    rl.configure(1.0, 1);
+    rl.tryAcquire();
+    ASSERT(!rl.tryAcquire());  // denied
+    rl.disable();
+    ASSERT(rl.tryAcquire());  // allowed again
+}
+
+TEST(rate_limiter_reset_stats) {
+    RateLimiter rl;
+    rl.configure(1.0, 2);
+    rl.tryAcquire();
+    rl.tryAcquire();
+    rl.tryAcquire();
+    rl.resetStats();
+    ASSERT_EQ(rl.totalAllowed(), 0UL);
+    ASSERT_EQ(rl.totalDenied(), 0UL);
+}
+
+// ── Lifecycle Hooks Tests ──────────────────────────────────────────────
+
+TEST(lifecycle_on_initialize_called) {
+    Server* s = makeTestServer();
+    String capturedClient;
+    s->onInitialize([&](const String& name) {
+        capturedClient = name;
+    });
+
+    String req = R"({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","clientInfo":{"name":"test-client","version":"1.0"}}})";
+    String resp = s->_processJsonRpc(req);
+    ASSERT_EQ(capturedClient, String("test-client"));
+    ASSERT_STR_CONTAINS(resp.c_str(), "\"protocolVersion\"");
+}
+
+TEST(lifecycle_on_initialize_unknown_client) {
+    Server* s = makeTestServer();
+    String capturedClient;
+    s->onInitialize([&](const String& name) {
+        capturedClient = name;
+    });
+
+    // Initialize without clientInfo
+    String req = R"({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26"}})";
+    s->_processJsonRpc(req);
+    ASSERT_EQ(capturedClient, String("unknown"));
+}
+
+TEST(rate_limit_in_server_info) {
+    Server* s = makeTestServer();
+    s->setRateLimit(10.0, 20);
+
+    String req = R"({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","clientInfo":{"name":"test"}}})";
+    String resp = s->_processJsonRpc(req);
+    ASSERT_STR_CONTAINS(resp.c_str(), "\"rateLimit\"");
+    ASSERT_STR_CONTAINS(resp.c_str(), "\"requestsPerSecond\"");
+}
+
+TEST(rate_limit_not_in_server_info_when_disabled) {
+    Server* s = makeTestServer();
+    // Don't configure rate limiting
+
+    String req = R"({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","clientInfo":{"name":"test"}}})";
+    String resp = s->_processJsonRpc(req);
+    // Should NOT contain rateLimit
+    std::string r(resp.c_str());
+    ASSERT(r.find("rateLimit") == std::string::npos);
+}
+
+// ── Version Tests ──────────────────────────────────────────────────────
+
+TEST(version_0_10_0) {
+    Server* s = makeTestServer();
+    String req = R"({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","clientInfo":{"name":"test"}}})";
+    String resp = s->_processJsonRpc(req);
+    ASSERT_STR_CONTAINS(resp.c_str(), "0.10.0");
+}
+
+// ── Watchdog Tool Tests ────────────────────────────────────────────────
+
+TEST(watchdog_status_default) {
+    // Test that the status function returns valid JSON with enabled=false
+    // (We can't call the tool directly without registering, but we can test the static state)
+    // WatchdogTool is header-only with statics, so we can verify the initial state
+    ASSERT(!mcpd::tools::WatchdogTool::_enabled);
+    ASSERT_EQ(mcpd::tools::WatchdogTool::_timeoutSec, 0);
+}
+
+TEST(watchdog_tool_registration) {
+    Server* s = makeTestServer();
+    size_t before = s->_tools.size();
+    mcpd::tools::WatchdogTool::registerAll(*s);
+    // Should add 4 tools: status, enable, feed, disable
+    ASSERT_EQ(s->_tools.size(), before + 4);
 }
 
 // ── Main ───────────────────────────────────────────────────────────────

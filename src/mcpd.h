@@ -33,8 +33,13 @@
 #include "MCPSampling.h"
 #include "MCPElicitation.h"
 #include "MCPTransportWS.h"
+#include "MCPRateLimit.h"
 
-#define MCPD_VERSION "0.9.0"
+#ifdef ESP32
+#include "MCPTransportBLE.h"
+#endif
+
+#define MCPD_VERSION "0.10.0"
 #define MCPD_MCP_PROTOCOL_VERSION "2025-03-26"
 
 namespace mcpd {
@@ -205,6 +210,42 @@ public:
      */
     void enableWebSocket(uint16_t port = 8081);
 
+#ifdef ESP32
+    /**
+     * Enable BLE transport alongside HTTP.
+     * Call before begin(). Uses ESP32 BLE GATT server.
+     * @param deviceName  BLE device name (default: server name)
+     * @param mtu         Negotiated MTU size (default 512)
+     */
+    void enableBLE(const char* deviceName = nullptr, uint16_t mtu = 512);
+#endif
+
+    // ── Rate Limiting ──────────────────────────────────────────────────
+
+    /**
+     * Enable request rate limiting to protect the device.
+     * @param requestsPerSecond  Sustained rate
+     * @param burstCapacity      Maximum burst size
+     */
+    void setRateLimit(float requestsPerSecond, size_t burstCapacity);
+
+    /** Access the rate limiter for stats or manual control */
+    RateLimiter& rateLimiter() { return _rateLimiter; }
+
+    // ── Lifecycle Hooks ────────────────────────────────────────────────
+
+    using LifecycleCallback = std::function<void()>;
+    using InitCallback = std::function<void(const String& clientName)>;
+
+    /** Called when a new session is initialized (receives client info) */
+    void onInitialize(InitCallback cb) { _onInitializeCb = cb; }
+
+    /** Called when a client connects (HTTP/SSE/WS/BLE) */
+    void onConnect(LifecycleCallback cb) { _onConnectCb = cb; }
+
+    /** Called when a client disconnects */
+    void onDisconnect(LifecycleCallback cb) { _onDisconnectCb = cb; }
+
     // ── Resource Subscriptions ─────────────────────────────────────────
 
     /**
@@ -264,6 +305,19 @@ private:
     SSEManager _sseManager;
     WebSocketTransport* _wsTransport = nullptr;
     uint16_t _wsPort = 0;
+
+#ifdef ESP32
+    BLETransport* _bleTransport = nullptr;
+    const char* _bleName = nullptr;
+    uint16_t _bleMtu = 512;
+#endif
+
+    RateLimiter _rateLimiter;
+
+    // Lifecycle callbacks
+    InitCallback _onInitializeCb;
+    LifecycleCallback _onConnectCb;
+    LifecycleCallback _onDisconnectCb;
 
     std::vector<MCPTool> _tools;
     std::vector<std::pair<String, MCPRichToolHandler>> _richTools;  // name → handler

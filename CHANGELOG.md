@@ -2,6 +2,55 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.0] - 2026-02-18
+
+### Added
+- **BLE Transport** (`MCPTransportBLE.h`) — Bluetooth Low Energy GATT server for ESP32:
+  - Custom MCP BLE service with RX/TX/Status characteristics
+  - Automatic message chunking for large payloads (configurable MTU)
+  - Chunk framing protocol: single/first/continue/final headers
+  - Connect/disconnect event callbacks
+  - Auto-restart advertising after client disconnects
+  - `server.enableBLE("device-name")` — enable before `begin()`
+  - Enables phone/tablet MCP access without WiFi infrastructure
+- **Rate Limiting** (`MCPRateLimit.h`) — Token bucket rate limiter for device protection:
+  - `server.setRateLimit(rps, burst)` — configure sustained rate and burst capacity
+  - HTTP 429 response with JSON-RPC error when limit exceeded
+  - Rate limit info advertised in `initialize` response (`serverInfo.rateLimit`)
+  - Stats tracking: `totalAllowed()`, `totalDenied()`, `resetStats()`
+  - O(1) per-request check, constant memory
+- **Connection Lifecycle Hooks** — callbacks for session events:
+  - `server.onInitialize(callback)` — called with client name on new session
+  - `server.onConnect(callback)` — called on transport connect (SSE/WS/BLE)
+  - `server.onDisconnect(callback)` — called on transport disconnect
+- **Watchdog Tool** (`tools/MCPWatchdogTool.h`) — hardware watchdog management:
+  - `watchdog_status` — get enabled state, timeout, time since last feed, reset reason
+  - `watchdog_enable` — enable with configurable timeout (1-120s) and panic mode
+  - `watchdog_feed` — feed/reset the watchdog timer
+  - `watchdog_disable` — disable the watchdog
+  - Proper MCP tool annotations (readOnly, destructive, title)
+  - ESP32 `esp_task_wdt` integration
+- **BLE Gateway Example** (`examples/ble_gateway/`) — demonstrates:
+  - Dual WiFi + BLE MCP server
+  - Rate limiting for device protection
+  - Lifecycle hooks for status LED
+  - Watchdog tool for production reliability
+- 13 new unit tests:
+  - Rate limiter: default disabled, configure, burst capacity, stats, disable, reset (6)
+  - Lifecycle hooks: onInitialize called, unknown client (2)
+  - Rate limit integration: in server info, not when disabled (2)
+  - Version: 0.10.0 check (1)
+  - Watchdog: default state, tool registration (2)
+
+### Changed
+- Bumped version to 0.10.0
+- Total tests: 123 → 136 (13 new unit tests) + 15 HTTP integration tests
+- `server.loop()` now processes BLE transport and forwards notifications via BLE
+- `_handleMCPPost()` checks rate limiter before processing requests
+- `_handleInitialize()` calls lifecycle hook and includes rate limit info
+- `server.stop()` cleans up BLE transport
+- Built-in tools now total 34 (30 + 4 watchdog tools)
+
 ## [0.9.0] - 2026-02-18
 
 ### Added

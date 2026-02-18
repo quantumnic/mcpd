@@ -182,6 +182,22 @@ void Server::begin() {
         Serial.printf("[mcpd] WebSocket transport on port %d\n", _wsPort);
     }
 
+    // Start BLE transport if enabled
+#ifdef ESP32
+    if (_bleName) {
+        _bleTransport = new BLETransport(_bleName, _bleMtu);
+        _bleTransport->onMessage([this](const String& msg) -> String {
+            return _processJsonRpc(msg);
+        });
+        _bleTransport->onConnection([this](bool connected) {
+            if (connected && _onConnectCb) _onConnectCb();
+            if (!connected && _onDisconnectCb) _onDisconnectCb();
+        });
+        _bleTransport->begin();
+        Serial.printf("[mcpd] BLE transport enabled: %s\n", _bleName);
+    }
+#endif
+
     Serial.printf("[mcpd] Server '%s' started on port %d, endpoint %s\n",
                   _name, _port, _endpoint);
 }
@@ -226,10 +242,37 @@ void Server::loop() {
     if (_wsTransport) {
         _wsTransport->loop();
     }
+
+    // Process BLE transport if enabled
+#ifdef ESP32
+    if (_bleTransport) {
+        _bleTransport->loop();
+
+        // Forward pending notifications via BLE too
+        if (_bleTransport->isConnected() && !_pendingNotifications.empty()) {
+            for (const auto& notif : _pendingNotifications) {
+                _bleTransport->sendNotification(notif);
+            }
+            // Note: don't clear here — SSE might still need them
+            // They're cleared after SSE broadcast above
+        }
+    }
+#endif
 }
 
 void Server::enableWebSocket(uint16_t port) {
     _wsPort = port;
+}
+
+#ifdef ESP32
+void Server::enableBLE(const char* deviceName, uint16_t mtu) {
+    _bleName = deviceName;
+    _bleMtu = mtu;
+}
+#endif
+
+void Server::setRateLimit(float requestsPerSecond, size_t burstCapacity) {
+    _rateLimiter.configure(requestsPerSecond, burstCapacity);
 }
 
 void Server::stop() {
@@ -243,6 +286,13 @@ void Server::stop() {
         delete _wsTransport;
         _wsTransport = nullptr;
     }
+#ifdef ESP32
+    if (_bleTransport) {
+        _bleTransport->stop();
+        delete _bleTransport;
+        _bleTransport = nullptr;
+    }
+#endif
     _initialized = false;
     _sessionId = "";
 }
@@ -253,6 +303,13 @@ void Server::stop() {
 
 void Server::_handleMCPPost() {
     transport::setCORSHeaders(*_httpServer);
+
+    // Rate limit check
+    if (_rateLimiter.isEnabled() && !_rateLimiter.tryAcquire()) {
+        _httpServer->send(429, transport::CONTENT_TYPE_JSON,
+                          _jsonRpcError(JsonVariant(), -32000, "Rate limit exceeded"));
+        return;
+    }
 
     String body = _httpServer->arg("plain");
     if (body.isEmpty()) {
@@ -453,6 +510,16 @@ String Server::_handleInitialize(JsonVariant params, JsonVariant id) {
     _sessionId = _generateSessionId();
     _initialized = true;
 
+    // Extract client info and call lifecycle hook
+    if (_onInitializeCb) {
+        String clientName = "unknown";
+        if (!params.isNull() && !params["clientInfo"].isNull()) {
+            const char* cn = params["clientInfo"]["name"].as<const char*>();
+            if (cn) clientName = cn;
+        }
+        _onInitializeCb(clientName);
+    }
+
     JsonDocument result;
     result["protocolVersion"] = MCPD_MCP_PROTOCOL_VERSION;
 
@@ -499,6 +566,13 @@ String Server::_handleInitialize(JsonVariant params, JsonVariant id) {
     // Advertise completion capability if providers are registered
     if (_completions.hasProviders()) {
         capabilities["completion"].to<JsonObject>();
+    }
+
+    // Include rate limit info in server info if enabled
+    if (_rateLimiter.isEnabled()) {
+        JsonObject rateLimit = serverInfo["rateLimit"].to<JsonObject>();
+        rateLimit["requestsPerSecond"] = _rateLimiter.requestsPerSecond();
+        rateLimit["burstCapacity"] = (int)_rateLimiter.burstCapacity();
     }
 
     String resultStr;
