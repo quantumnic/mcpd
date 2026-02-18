@@ -2,6 +2,57 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.0] - 2026-02-18
+
+### Added
+- **Elicitation Support** (`MCPElicitation.h`) — server can request structured user input from the client:
+  - `MCPElicitationRequest` — build form-like input requests with typed fields
+  - Field types: text, number, integer, boolean, enum/select
+  - Field constraints: required, min/max, default values, enum options
+  - `MCPElicitationResponse` — parse user responses with typed getters
+  - `ElicitationManager` — queues requests, drains via SSE, handles async responses
+  - `server.requestElicitation(request, callback)` — high-level API
+  - Three response actions: accept (with content), decline, cancel
+  - Server advertises `elicitation` capability in `initialize` response
+  - Client responses to elicitation requests are automatically routed to callbacks
+  - 120s default timeout (generous for user form-filling)
+- **Audio Content Type** (`MCPContent.h`) — tools can now return audio data:
+  - `MCPContent::makeAudio(base64Data, mimeType)` — create audio content
+  - `MCPToolResult::audio(data, mimeType, description)` — convenience factory
+  - Serializes as `{ type: "audio", data: "...", mimeType: "audio/wav" }`
+  - Useful for microphone recordings, alert sounds, sensor sonification
+- **I2C Bus Scanner Tool** (`tools/MCPI2CScannerTool.h`) — hardware debugging utility:
+  - `i2c_scan` — scan entire I2C bus, identify 30+ common sensors/ICs by address
+  - `i2c_probe` — probe a specific I2C address with detailed error reporting
+  - Configurable bus (0/1), SDA/SCL pins, bus speed
+  - Device identification database: BME280, SSD1306, MPU6050, DS3231, AHT20, etc.
+  - Both tools marked readOnly + localOnly
+- **Server-Integrated WebSocket Transport** — use WS alongside HTTP:
+  - `server.enableWebSocket(port)` — enable WS transport before `begin()`
+  - WebSocket server starts automatically alongside HTTP
+  - WS port advertised via mDNS service TXT record
+  - JSON-RPC messages processed through same dispatch pipeline
+  - Enables clients that prefer WebSocket (Cline, Continue, etc.)
+- **Interactive Config Example** (`examples/interactive_config/`) — demonstrates:
+  - Elicitation for runtime configuration wizard
+  - I2C scanner for hardware discovery
+  - WebSocket transport alongside HTTP
+  - Custom tools for config management
+- 14 new unit tests:
+  - Elicitation: request serialization, integer fields, response accept/decline/cancel,
+    manager queue/drain/response/unknown, server capability, server response handling (10)
+  - Audio content: factory, serialization, tool result with/without description (4)
+
+### Changed
+- Bumped version to 0.9.0
+- Total tests: 109 → 123 (14 new unit tests) + 15 HTTP integration tests
+- `server.loop()` now manages elicitation outgoing, pruning, and WebSocket transport
+- JSON-RPC processor handles elicitation responses alongside sampling responses
+- Built-in tools now total 30 (28 + 2 I2C scanner tools)
+- WiFiClient mock expanded with read/write/available/operator bool
+- WiFiServer mock added for test compilation
+- String mock expanded with `endsWith()` method
+
 ## [0.8.0] - 2026-02-18
 
 ### Added

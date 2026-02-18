@@ -96,6 +96,15 @@ public:
     bool startsWith(const char* prefix) const {
         return _s.compare(0, strlen(prefix), prefix) == 0;
     }
+    bool endsWith(const String& suffix) const {
+        if (suffix.length() > length()) return false;
+        return _s.compare(length() - suffix.length(), suffix.length(), suffix._s) == 0;
+    }
+    bool endsWith(const char* suffix) const {
+        size_t slen = strlen(suffix);
+        if (slen > length()) return false;
+        return _s.compare(length() - slen, slen, suffix) == 0;
+    }
 
     // Needed for ArduinoJson's Writer to reset the string
     String& operator=(const char* s) { _s = s ? s : ""; return *this; }
@@ -220,6 +229,14 @@ inline WiFiMock WiFi;
 class WiFiClient {
 public:
     bool connected() const { return _connected; }
+    operator bool() const { return _connected; }
+    int available() const { return 0; }
+    int read() { return -1; }
+    size_t write(uint8_t b) { _buffer += (char)b; return 1; }
+    size_t write(const uint8_t* buf, size_t len) {
+        for (size_t i = 0; i < len; i++) _buffer += (char)buf[i];
+        return len;
+    }
     size_t print(const String& s) { _buffer += s; return s.length(); }
     size_t println(const String& s) { _buffer += s + "\n"; return s.length() + 1; }
     size_t println() { _buffer += "\n"; return 1; }
@@ -233,6 +250,18 @@ public:
 private:
     bool _connected = true;
     String _buffer;
+};
+
+// ── WiFiServer Mock ────────────────────────────────────────────────────
+
+class WiFiServer {
+public:
+    WiFiServer(uint16_t port) : _port(port) {}
+    void begin() {}
+    void stop() {}
+    WiFiClient available() { return WiFiClient(); }
+private:
+    uint16_t _port;
 };
 
 // ── WebServer Mock ─────────────────────────────────────────────────────

@@ -31,8 +31,10 @@
 #include "MCPTransport.h"
 #include "MCPTransportSSE.h"
 #include "MCPSampling.h"
+#include "MCPElicitation.h"
+#include "MCPTransportWS.h"
 
-#define MCPD_VERSION "0.8.0"
+#define MCPD_VERSION "0.9.0"
 #define MCPD_MCP_PROTOCOL_VERSION "2025-03-26"
 
 namespace mcpd {
@@ -164,6 +166,9 @@ public:
     /** Access the SSE manager for server-push connections */
     SSEManager& sse() { return _sseManager; }
 
+    /** Access the elicitation manager for requesting user input */
+    ElicitationManager& elicitation() { return _elicitationManager; }
+
     /**
      * Request LLM sampling from the connected client.
      * The request is queued and sent via SSE; the response arrives asynchronously.
@@ -182,6 +187,23 @@ public:
      */
     void reportProgress(const String& progressToken, double progress,
                         double total = 0, const String& message = "");
+
+    /**
+     * Request user input (elicitation) from the connected client.
+     * The request is queued and sent via SSE; the response arrives asynchronously.
+     * @param request   Elicitation request with message and field definitions
+     * @param callback  Called when the client responds (accept/decline/cancel)
+     * @return Request ID, or -1 if no SSE client is connected
+     */
+    int requestElicitation(const MCPElicitationRequest& request,
+                           MCPElicitationCallback callback);
+
+    /**
+     * Enable WebSocket transport alongside HTTP.
+     * Call before begin(). The WS server runs on a separate port.
+     * @param port  WebSocket port (default 8081)
+     */
+    void enableWebSocket(uint16_t port = 8081);
 
     // ── Resource Subscriptions ─────────────────────────────────────────
 
@@ -238,7 +260,10 @@ private:
     CompletionManager _completions;
     RequestTracker _requestTracker;
     SamplingManager _samplingManager;
+    ElicitationManager _elicitationManager;
     SSEManager _sseManager;
+    WebSocketTransport* _wsTransport = nullptr;
+    uint16_t _wsPort = 0;
 
     std::vector<MCPTool> _tools;
     std::vector<std::pair<String, MCPRichToolHandler>> _richTools;  // name → handler

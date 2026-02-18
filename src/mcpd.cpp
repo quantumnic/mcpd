@@ -167,6 +167,21 @@ void Server::begin() {
         }
     }
 
+    // Start WebSocket transport if enabled
+    if (_wsPort > 0) {
+        _wsTransport = new WebSocketTransport(_wsPort);
+        _wsTransport->onMessage([this](const String& msg) -> String {
+            return _processJsonRpc(msg);
+        });
+        _wsTransport->begin();
+        if (_mdnsEnabled) {
+            char wsPortStr[8];
+            snprintf(wsPortStr, sizeof(wsPortStr), "%d", _wsPort);
+            MDNS.addServiceTxt("mcp", "tcp", "ws_port", wsPortStr);
+        }
+        Serial.printf("[mcpd] WebSocket transport on port %d\n", _wsPort);
+    }
+
     Serial.printf("[mcpd] Server '%s' started on port %d, endpoint %s\n",
                   _name, _port, _endpoint);
 }
@@ -195,8 +210,26 @@ void Server::loop() {
         }
     }
 
-    // Prune expired sampling requests
+    // Send any pending elicitation requests via SSE
+    auto elicitOutgoing = _elicitationManager.drainOutgoing();
+    for (const auto& msg : elicitOutgoing) {
+        if (_sseManager.hasClients(_sessionId)) {
+            _sseManager.broadcast(_sessionId, msg);
+        }
+    }
+
+    // Prune expired requests
     _samplingManager.pruneExpired();
+    _elicitationManager.pruneExpired();
+
+    // Process WebSocket transport if enabled
+    if (_wsTransport) {
+        _wsTransport->loop();
+    }
+}
+
+void Server::enableWebSocket(uint16_t port) {
+    _wsPort = port;
 }
 
 void Server::stop() {
@@ -204,6 +237,11 @@ void Server::stop() {
         _httpServer->stop();
         delete _httpServer;
         _httpServer = nullptr;
+    }
+    if (_wsTransport) {
+        _wsTransport->stop();
+        delete _wsTransport;
+        _wsTransport = nullptr;
     }
     _initialized = false;
     _sessionId = "";
@@ -343,12 +381,14 @@ String Server::_processJsonRpc(const String& body) {
         return _jsonRpcError(id, -32600, "Invalid Request: missing or wrong jsonrpc version");
     }
 
-    // Check if this is a response to a server-initiated request (e.g., sampling)
+    // Check if this is a response to a server-initiated request (sampling or elicitation)
     if (!method && !id.isNull() && !doc["result"].isNull()) {
         int respId = id.as<int>();
         JsonObject result = doc["result"].as<JsonObject>();
         if (_samplingManager.handleResponse(respId, result)) {
             Serial.printf("[mcpd] Sampling response received (id: %d)\n", respId);
+        } else if (_elicitationManager.handleResponse(respId, result)) {
+            Serial.printf("[mcpd] Elicitation response received (id: %d)\n", respId);
         }
         return "";  // No response needed for responses
     }
@@ -452,6 +492,9 @@ String Server::_handleInitialize(JsonVariant params, JsonVariant id) {
 
     // Advertise sampling capability (server can request LLM inference from client)
     capabilities["sampling"].to<JsonObject>();
+
+    // Advertise elicitation capability (server can request user input from client)
+    capabilities["elicitation"].to<JsonObject>();
 
     // Advertise completion capability if providers are registered
     if (_completions.hasProviders()) {
@@ -907,6 +950,18 @@ int Server::requestSampling(const MCPSamplingRequest& request, MCPSamplingCallba
 
     int id = _samplingManager.queueRequest(request, callback);
     Serial.printf("[mcpd] Sampling request queued (id: %d)\n", id);
+    return id;
+}
+
+int Server::requestElicitation(const MCPElicitationRequest& request,
+                               MCPElicitationCallback callback) {
+    if (!_sseManager.hasClients(_sessionId)) {
+        Serial.println("[mcpd] Cannot send elicitation request: no SSE clients connected");
+        return -1;
+    }
+
+    int id = _elicitationManager.queueRequest(request, callback);
+    Serial.printf("[mcpd] Elicitation request queued (id: %d)\n", id);
     return id;
 }
 

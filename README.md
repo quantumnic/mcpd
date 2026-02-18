@@ -33,14 +33,16 @@
 |---|:---:|:---:|:---:|
 | Runs on the MCU | ✅ | ✅ | ❌ CLI tool |
 | MCP spec compliant | ✅ 2025-03-26 | ❌ custom WS | ❌ |
-| Actually compiles | ✅ 109 tests | ❌ self-described | N/A |
+| Actually compiles | ✅ 123 tests | ❌ self-described | N/A |
 | Streamable HTTP + SSE | ✅ | ❌ | ❌ |
 | WebSocket transport | ✅ | ✅ | ❌ |
 | Claude Desktop bridge | ✅ | ❌ | ❌ |
 | mDNS discovery | ✅ | ❌ | ❌ |
 | Resource Templates (RFC 6570) | ✅ | ❌ | ❌ |
-| Built-in tools (GPIO, I2C, SPI, ADC, UART, FS, Power, Timer…) | ✅ 28 tools | ❌ | ❌ |
+| Built-in tools (GPIO, I2C, SPI, ADC, UART, FS, Power, Timer…) | ✅ 30 tools | ❌ | ❌ |
 | Sampling (server requests LLM from client) | ✅ | ❌ | ❌ |
+| Elicitation (server requests user input) | ✅ | ❌ | ❌ |
+| Audio content type | ✅ | ❌ | ❌ |
 | Tool Annotations (readOnly, destructive hints) | ✅ | ❌ | ❌ |
 | Structured Content (text, image, resource) | ✅ | ❌ | ❌ |
 | Progress Notifications | ✅ | ❌ | ❌ |

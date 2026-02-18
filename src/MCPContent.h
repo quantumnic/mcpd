@@ -7,6 +7,7 @@
  * MCP 2025-03-26 spec defines three content types:
  *   - TextContent:     { type: "text", text: "..." }
  *   - ImageContent:    { type: "image", data: "base64...", mimeType: "image/png" }
+ *   - AudioContent:    { type: "audio", data: "base64...", mimeType: "audio/wav" }
  *   - ResourceContent: { type: "resource", resource: { uri, mimeType, text|blob } }
  */
 
@@ -23,7 +24,7 @@ namespace mcpd {
  * A single content item in a tool result.
  */
 struct MCPContent {
-    enum Type { TEXT, IMAGE, RESOURCE };
+    enum Type { TEXT, IMAGE, AUDIO, RESOURCE };
 
     Type type;
     String text;        // For TEXT: the text content
@@ -44,6 +45,15 @@ struct MCPContent {
     static MCPContent makeImage(const String& base64Data, const String& mimeType) {
         MCPContent c;
         c.type = IMAGE;
+        c.data = base64Data;
+        c.mimeType = mimeType;
+        return c;
+    }
+
+    // Factory: audio content
+    static MCPContent makeAudio(const String& base64Data, const String& mimeType) {
+        MCPContent c;
+        c.type = AUDIO;
         c.data = base64Data;
         c.mimeType = mimeType;
         return c;
@@ -79,6 +89,11 @@ struct MCPContent {
                 break;
             case IMAGE:
                 obj["type"] = "image";
+                obj["data"] = data;
+                obj["mimeType"] = mimeType;
+                break;
+            case AUDIO:
+                obj["type"] = "audio";
                 obj["data"] = data;
                 obj["mimeType"] = mimeType;
                 break;
@@ -131,6 +146,17 @@ struct MCPToolResult {
             r.content.push_back(MCPContent::makeText(altText));
         }
         r.content.push_back(MCPContent::makeImage(base64Data, mimeType));
+        return r;
+    }
+
+    // Convenience: single audio result
+    static MCPToolResult audio(const String& base64Data, const String& mimeType,
+                               const String& description = "") {
+        MCPToolResult r;
+        if (!description.isEmpty()) {
+            r.content.push_back(MCPContent::makeText(description));
+        }
+        r.content.push_back(MCPContent::makeAudio(base64Data, mimeType));
         return r;
     }
 

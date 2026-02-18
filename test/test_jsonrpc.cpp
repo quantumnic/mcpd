@@ -14,6 +14,7 @@
 #include "../src/tools/MCPGPIOTool.h"
 #include "../src/MCPContent.h"
 #include "../src/MCPProgress.h"
+#include "../src/MCPElicitation.h"
 
 using namespace mcpd;
 
@@ -705,11 +706,11 @@ TEST(pagination_resources) {
     ASSERT_STR_CONTAINS(resp.c_str(), "\"nextCursor\"");
 }
 
-TEST(version_is_0_8_0) {
+TEST(version_is_0_9_0) {
     auto* s = makeTestServer();
     String req = R"({"jsonrpc":"2.0","id":250,"method":"initialize","params":{}})";
     String resp = s->_processJsonRpc(req);
-    ASSERT_STR_CONTAINS(resp.c_str(), "\"version\":\"0.8.0\"");
+    ASSERT_STR_CONTAINS(resp.c_str(), "\"version\":\"0.9.0\"");
 }
 
 // ── v0.6.0 Tests: Tool Annotations ────────────────────────────────────
@@ -1266,6 +1267,191 @@ TEST(server_handles_sampling_response_in_jsonrpc) {
 
     ASSERT_EQ(receivedText, String("AI says hello"));
     ASSERT(!s->sampling().hasPending());
+}
+
+// ── Elicitation Tests ──────────────────────────────────────────────────
+
+TEST(elicitation_request_serialization) {
+    MCPElicitationRequest req;
+    req.message = "Configure sensor";
+    req.addTextField("name", "Sensor Name", true);
+    req.addNumberField("threshold", "Alert Threshold", false, 0, 100);
+    req.addBooleanField("enabled", "Enable Alerts", false, true);
+    req.addEnumField("unit", "Unit", {"celsius", "fahrenheit"}, true);
+
+    String json = req.toJsonRpc(8000);
+    ASSERT_STR_CONTAINS(json.c_str(), "elicitation/create");
+    ASSERT_STR_CONTAINS(json.c_str(), "Configure sensor");
+    ASSERT_STR_CONTAINS(json.c_str(), "\"name\"");
+    ASSERT_STR_CONTAINS(json.c_str(), "\"threshold\"");
+    ASSERT_STR_CONTAINS(json.c_str(), "\"enabled\"");
+    ASSERT_STR_CONTAINS(json.c_str(), "celsius");
+    ASSERT_STR_CONTAINS(json.c_str(), "fahrenheit");
+    ASSERT_STR_CONTAINS(json.c_str(), "requestedSchema");
+}
+
+TEST(elicitation_request_integer_field) {
+    MCPElicitationRequest req;
+    req.message = "Set config";
+    req.addIntegerField("count", "Item Count", true, 1, 50);
+
+    String json = req.toJsonRpc(8001);
+    ASSERT_STR_CONTAINS(json.c_str(), "\"integer\"");
+    ASSERT_STR_CONTAINS(json.c_str(), "Item Count");
+}
+
+TEST(elicitation_response_accept) {
+    JsonDocument doc;
+    doc["action"] = "accept";
+    JsonObject content = doc["content"].to<JsonObject>();
+    content["name"] = "Kitchen Sensor";
+    content["threshold"] = 42.5;
+    content["enabled"] = true;
+    content["count"] = 7;
+
+    MCPElicitationResponse resp = MCPElicitationResponse::fromJson(doc.as<JsonObject>());
+    ASSERT(resp.valid);
+    ASSERT(resp.accepted());
+    ASSERT(!resp.declined());
+    ASSERT_EQ(resp.getString("name"), String("Kitchen Sensor"));
+    ASSERT_EQ(resp.getFloat("threshold"), 42.5f);
+    ASSERT_EQ(resp.getBool("enabled"), true);
+    ASSERT_EQ(resp.getInt("count"), 7);
+}
+
+TEST(elicitation_response_decline) {
+    JsonDocument doc;
+    doc["action"] = "decline";
+
+    MCPElicitationResponse resp = MCPElicitationResponse::fromJson(doc.as<JsonObject>());
+    ASSERT(resp.valid);
+    ASSERT(resp.declined());
+    ASSERT(!resp.accepted());
+    ASSERT_EQ(resp.getString("name"), String(""));
+    ASSERT_EQ(resp.getInt("count", 99), 99);
+}
+
+TEST(elicitation_response_cancel) {
+    JsonDocument doc;
+    doc["action"] = "cancel";
+
+    MCPElicitationResponse resp = MCPElicitationResponse::fromJson(doc.as<JsonObject>());
+    ASSERT(resp.valid);
+    ASSERT(!resp.accepted());
+    ASSERT(!resp.declined());
+}
+
+TEST(elicitation_manager_queue_and_drain) {
+    ElicitationManager em;
+    MCPElicitationRequest req;
+    req.message = "Test";
+    req.addTextField("x", "X", false);
+
+    bool called = false;
+    int id = em.queueRequest(req, [&](const MCPElicitationResponse& r) { called = true; });
+    ASSERT(id >= 8000);
+    ASSERT(em.hasPending());
+    ASSERT_EQ(em.pendingCount(), (size_t)1);
+
+    auto out = em.drainOutgoing();
+    ASSERT_EQ(out.size(), (size_t)1);
+    ASSERT_STR_CONTAINS(out[0].c_str(), "elicitation/create");
+
+    // Second drain should be empty
+    auto out2 = em.drainOutgoing();
+    ASSERT_EQ(out2.size(), (size_t)0);
+}
+
+TEST(elicitation_manager_handle_response) {
+    ElicitationManager em;
+    MCPElicitationRequest req;
+    req.message = "Test";
+    req.addTextField("val", "Value", true);
+
+    String receivedVal;
+    int id = em.queueRequest(req, [&](const MCPElicitationResponse& r) {
+        receivedVal = r.getString("val");
+    });
+
+    JsonDocument doc;
+    doc["action"] = "accept";
+    doc["content"]["val"] = "Hello World";
+
+    bool matched = em.handleResponse(id, doc.as<JsonObject>());
+    ASSERT(matched);
+    ASSERT_EQ(receivedVal, String("Hello World"));
+    ASSERT(!em.hasPending());
+}
+
+TEST(elicitation_manager_unknown_response) {
+    ElicitationManager em;
+    JsonDocument doc;
+    doc["action"] = "accept";
+    bool matched = em.handleResponse(99999, doc.as<JsonObject>());
+    ASSERT(!matched);
+}
+
+TEST(server_advertises_elicitation_capability) {
+    auto* s = makeTestServer();
+    String req = R"({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}})";
+    String resp = s->_processJsonRpc(req);
+    ASSERT_STR_CONTAINS(resp.c_str(), "\"elicitation\"");
+}
+
+TEST(server_handles_elicitation_response_in_jsonrpc) {
+    auto* s = makeTestServer();
+    s->_processJsonRpc(R"({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}})");
+
+    MCPElicitationRequest req;
+    req.message = "Test input";
+    req.addTextField("answer", "Answer", true);
+
+    String receivedAnswer;
+    int id = s->elicitation().queueRequest(req, [&](const MCPElicitationResponse& r) {
+        receivedAnswer = r.getString("answer");
+    });
+
+    String response = String(R"({"jsonrpc":"2.0","id":)") + String(id) +
+        R"(,"result":{"action":"accept","content":{"answer":"42"}}})";
+    s->_processJsonRpc(response);
+
+    ASSERT_EQ(receivedAnswer, String("42"));
+    ASSERT(!s->elicitation().hasPending());
+}
+
+// ── Audio Content Tests ────────────────────────────────────────────────
+
+TEST(audio_content_factory) {
+    MCPContent audio = MCPContent::makeAudio("AQID", "audio/wav");
+    ASSERT_EQ((int)audio.type, (int)MCPContent::AUDIO);
+    ASSERT_EQ(audio.data, String("AQID"));
+    ASSERT_EQ(audio.mimeType, String("audio/wav"));
+}
+
+TEST(audio_content_serialization) {
+    MCPContent audio = MCPContent::makeAudio("dGVzdA==", "audio/mp3");
+    JsonDocument doc;
+    JsonObject obj = doc.to<JsonObject>();
+    audio.toJson(obj);
+
+    String json;
+    serializeJson(doc, json);
+    ASSERT_STR_CONTAINS(json.c_str(), "\"type\":\"audio\"");
+    ASSERT_STR_CONTAINS(json.c_str(), "\"data\":\"dGVzdA==\"");
+    ASSERT_STR_CONTAINS(json.c_str(), "\"mimeType\":\"audio/mp3\"");
+}
+
+TEST(audio_tool_result_factory) {
+    MCPToolResult result = MCPToolResult::audio("AQID", "audio/wav", "Recording");
+    ASSERT_EQ(result.content.size(), (size_t)2);
+    ASSERT_EQ((int)result.content[0].type, (int)MCPContent::TEXT);
+    ASSERT_EQ((int)result.content[1].type, (int)MCPContent::AUDIO);
+}
+
+TEST(audio_tool_result_no_description) {
+    MCPToolResult result = MCPToolResult::audio("AQID", "audio/wav");
+    ASSERT_EQ(result.content.size(), (size_t)1);
+    ASSERT_EQ((int)result.content[0].type, (int)MCPContent::AUDIO);
 }
 
 // ── Main ───────────────────────────────────────────────────────────────
