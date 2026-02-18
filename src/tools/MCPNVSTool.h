@@ -59,11 +59,11 @@ public:
 
         // nvs_set — store a key-value pair
         server.addTool("nvs_set", "Store a key-value pair in persistent non-volatile storage (survives reboots)",
-            R"({"type":"object","properties":{"key":{"type":"string","description":"Storage key (max 15 chars)","maxLength":15},"value":{"description":"Value to store (string, number, or boolean)"},"type":{"type":"string","enum":["string","int","float","bool"],"description":"Value type (auto-detected if omitted)"}},"required":["key","value"]})",
+            R"=({"type":"object","properties":{"key":{"type":"string","description":"Storage key (max 15 chars)","maxLength":15},"value":{"description":"Value to store (string, number, or boolean)"},"type":{"type":"string","enum":["string","int","float","bool"],"description":"Value type (auto-detected if omitted)"}},"required":["key","value"]})=",
             [](const JsonObject& args) -> String {
                 const char* key = args["key"] | "";
                 if (strlen(key) == 0) return R"({"error":"Key is required"})";
-                if (strlen(key) > 15) return R"({"error":"Key too long (max 15 characters for NVS)"})";
+                if (strlen(key) > 15) return R"=({"error":"Key too long (max 15 characters for NVS)"})=";
 
                 String valueStr;
                 String type;
@@ -74,7 +74,7 @@ public:
 
                 // Auto-detect type if not specified
                 if (args["value"].is<bool>()) {
-                    bool v = args["value"];
+                    bool v = args["value"].as<bool>();
                     valueStr = v ? "true" : "false";
                     if (type.isEmpty()) type = "bool";
                 } else if (args["value"].is<int>() || args["value"].is<long>()) {

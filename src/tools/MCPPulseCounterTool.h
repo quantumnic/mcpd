@@ -107,7 +107,7 @@ inline int addPulseCounterTools(Server& server, int pin,
         MCPTool readTool;
         readTool.name = "pulse_read";
         readTool.description = "Read pulse counter: count, frequency (Hz), RPM, and scaled unit value. Useful for flow meters, tachometers, and event counting.";
-        readTool.inputSchemaJson = R"({
+        readTool.inputSchemaJson = R"=({
             "type": "object",
             "properties": {
                 "index": {
@@ -118,7 +118,7 @@ inline int addPulseCounterTools(Server& server, int pin,
                     "maximum": 3
                 }
             }
-        })";
+        })=";
         readTool.annotations.title = "Read Pulse Counter";
         readTool.annotations.readOnlyHint = true;
 
@@ -193,7 +193,7 @@ inline int addPulseCounterTools(Server& server, int pin,
         MCPTool resetTool;
         resetTool.name = "pulse_reset";
         resetTool.description = "Reset pulse counter to zero.";
-        resetTool.inputSchemaJson = R"({
+        resetTool.inputSchemaJson = R"=({
             "type": "object",
             "properties": {
                 "index": {
@@ -202,7 +202,7 @@ inline int addPulseCounterTools(Server& server, int pin,
                     "default": 0
                 }
             }
-        })";
+        })=";
         resetTool.annotations.title = "Reset Pulse Counter";
         resetTool.annotations.readOnlyHint = false;
 
@@ -234,7 +234,7 @@ inline int addPulseCounterTools(Server& server, int pin,
         MCPTool configTool;
         configTool.name = "pulse_config";
         configTool.description = "Configure pulse counter: scaling factor, unit name, glitch filter, edge mode.";
-        configTool.inputSchemaJson = R"({
+        configTool.inputSchemaJson = R"=({
             "type": "object",
             "properties": {
                 "index": {
@@ -268,7 +268,7 @@ inline int addPulseCounterTools(Server& server, int pin,
                     "enum": ["rising", "falling", "both"]
                 }
             }
-        })";
+        })=";
         configTool.annotations.title = "Configure Pulse Counter";
         configTool.annotations.readOnlyHint = false;
 

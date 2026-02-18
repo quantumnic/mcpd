@@ -23,7 +23,7 @@ public:
     static void attach(Server& server) {
         // uart_config — initialize a UART port
         server.addTool("uart_config", "Configure a hardware UART port (Serial1 or Serial2)",
-            R"({"type":"object","properties":{"port":{"type":"integer","enum":[1,2],"description":"UART port number (1=Serial1, 2=Serial2)"},"baud":{"type":"integer","description":"Baud rate (e.g. 9600, 115200)","enum":[300,1200,2400,4800,9600,19200,38400,57600,115200,230400,460800,921600]},"rxPin":{"type":"integer","description":"RX GPIO pin (optional, uses default if omitted)"},"txPin":{"type":"integer","description":"TX GPIO pin (optional, uses default if omitted)"}},"required":["port","baud"]})",
+            R"=({"type":"object","properties":{"port":{"type":"integer","enum":[1,2],"description":"UART port number (1=Serial1, 2=Serial2)"},"baud":{"type":"integer","description":"Baud rate (e.g. 9600, 115200)","enum":[300,1200,2400,4800,9600,19200,38400,57600,115200,230400,460800,921600]},"rxPin":{"type":"integer","description":"RX GPIO pin (optional, uses default if omitted)"},"txPin":{"type":"integer","description":"TX GPIO pin (optional, uses default if omitted)"}},"required":["port","baud"]})=",
             [](const JsonObject& args) -> String {
                 int port = args["port"];
                 int baud = args["baud"];
@@ -50,7 +50,7 @@ public:
 
         // uart_write — send data over UART
         server.addTool("uart_write", "Write data to a UART port",
-            R"({"type":"object","properties":{"port":{"type":"integer","enum":[1,2],"description":"UART port number"},"data":{"type":"string","description":"String data to send"},"hex":{"type":"string","description":"Hex-encoded bytes to send (e.g. 'FF01A0'). Use instead of data for binary."},"newline":{"type":"boolean","description":"Append \\r\\n after data (default false)"}},"required":["port"]})",
+            R"=({"type":"object","properties":{"port":{"type":"integer","enum":[1,2],"description":"UART port number"},"data":{"type":"string","description":"String data to send"},"hex":{"type":"string","description":"Hex-encoded bytes to send (e.g. 'FF01A0'). Use instead of data for binary."},"newline":{"type":"boolean","description":"Append \\r\\n after data (default false)"}},"required":["port"]})=",
             [](const JsonObject& args) -> String {
                 int port = args["port"];
                 HardwareSerial* serial = nullptr;
@@ -94,7 +94,7 @@ public:
 
         // uart_read — read available data from UART
         server.addTool("uart_read", "Read available data from a UART port",
-            R"({"type":"object","properties":{"port":{"type":"integer","enum":[1,2],"description":"UART port number"},"maxBytes":{"type":"integer","description":"Maximum bytes to read (default 256, max 1024)","minimum":1,"maximum":1024},"timeout":{"type":"integer","description":"Read timeout in milliseconds (default 100)","minimum":0,"maximum":5000},"asHex":{"type":"boolean","description":"Return data as hex string instead of text (for binary data)"}},"required":["port"]})",
+            R"=({"type":"object","properties":{"port":{"type":"integer","enum":[1,2],"description":"UART port number"},"maxBytes":{"type":"integer","description":"Maximum bytes to read (default 256, max 1024)","minimum":1,"maximum":1024},"timeout":{"type":"integer","description":"Read timeout in milliseconds (default 100)","minimum":0,"maximum":5000},"asHex":{"type":"boolean","description":"Return data as hex string instead of text (for binary data)"}},"required":["port"]})=",
             [](const JsonObject& args) -> String {
                 int port = args["port"];
                 HardwareSerial* serial = nullptr;

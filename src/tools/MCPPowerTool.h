@@ -83,14 +83,14 @@ inline void registerPowerTools(Server& server) {
             "power_deep_sleep",
             "Enter deep sleep mode. Wakes after specified duration or on external pin. "
             "WARNING: This stops all execution — the MCU will reset on wake.",
-            R"({
+            R"=({
                 "type":"object",
                 "properties":{
                     "duration_us":{"type":"integer","description":"Sleep duration in microseconds (0 = indefinite, wake by ext pin only)"},
                     "ext_wakeup_pin":{"type":"integer","description":"GPIO pin for external wakeup (EXT0, active high)"},
                     "ext_wakeup_level":{"type":"integer","enum":[0,1],"description":"Wakeup level: 0=low, 1=high (default 1)"}
                 }
-            })",
+            })=",
             [](const JsonObject& args) -> String {
                 uint64_t duration = 0;
                 if (args.containsKey("duration_us")) {
@@ -163,7 +163,7 @@ inline void registerPowerTools(Server& server) {
         MCPTool tool(
             "power_restart",
             "Software restart (reboot) the microcontroller. WARNING: Disconnects all clients.",
-            R"({"type":"object","properties":{"delay_ms":{"type":"integer","description":"Delay before restart in ms (default 100)","minimum":0,"maximum":10000}}})",
+            R"=({"type":"object","properties":{"delay_ms":{"type":"integer","description":"Delay before restart in ms (default 100)","minimum":0,"maximum":10000}}})=",
             [](const JsonObject& args) -> String {
                 int delay_ms = args.containsKey("delay_ms")
                     ? args["delay_ms"].as<int>() : 100;
@@ -188,14 +188,14 @@ inline void registerPowerTools(Server& server) {
             "power_watchdog",
             "Configure, feed, or disable the task watchdog timer (TWDT). "
             "Useful for detecting hangs in long-running operations.",
-            R"({
+            R"=({
                 "type":"object",
                 "properties":{
                     "action":{"type":"string","enum":["enable","feed","disable"],"description":"Watchdog action"},
                     "timeout_s":{"type":"integer","description":"Watchdog timeout in seconds (for enable)","minimum":1,"maximum":120}
                 },
                 "required":["action"]
-            })",
+            })=",
             [](const JsonObject& args) -> String {
                 const char* action = args["action"];
                 if (!action) return R"({"error":"missing action"})";

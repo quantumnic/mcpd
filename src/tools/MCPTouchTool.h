@@ -74,7 +74,7 @@ inline void addTouchTools(Server& server, const int* gpios, int count,
         MCPTool readTool;
         readTool.name = "touch_read";
         readTool.description = "Read capacitive touch sensor value from a specific pad. Lower values indicate touch.";
-        readTool.inputSchemaJson = R"({
+        readTool.inputSchemaJson = R"=({
             "type": "object",
             "properties": {
                 "index": {
@@ -87,7 +87,7 @@ inline void addTouchTools(Server& server, const int* gpios, int count,
                     "description": "GPIO pin number (alternative to index)"
                 }
             }
-        })";
+        })=";
         readTool.annotations.title = "Read Touch Sensor";
         readTool.annotations.readOnlyHint = true;
 
@@ -175,7 +175,7 @@ inline void addTouchTools(Server& server, const int* gpios, int count,
         MCPTool calTool;
         calTool.name = "touch_calibrate";
         calTool.description = "Calibrate touch thresholds from current readings. Run with all pads untouched to set accurate baselines.";
-        calTool.inputSchemaJson = R"({
+        calTool.inputSchemaJson = R"=({
             "type": "object",
             "properties": {
                 "samples": {
@@ -193,7 +193,7 @@ inline void addTouchTools(Server& server, const int* gpios, int count,
                     "maximum": 0.95
                 }
             }
-        })";
+        })=";
         calTool.annotations.title = "Calibrate Touch";
         calTool.annotations.readOnlyHint = false;
 

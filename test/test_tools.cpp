@@ -740,6 +740,14 @@ TEST(i2s_tools_register_all_six) {
 #include "../src/tools/MCPServoTool.h"
 #include "../src/tools/MCPSystemTool.h"
 #include "../src/tools/MCPUltrasonicTool.h"
+#include "../src/tools/MCPNVSTool.h"
+#include "../src/tools/MCPRelayTool.h"
+#include "../src/tools/MCPUARTTool.h"
+#include "../src/tools/MCPTimerTool.h"
+#include "../src/tools/MCPTouchTool.h"
+#include "../src/tools/MCPEncoderTool.h"
+#include "../src/tools/MCPPulseCounterTool.h"
+#include "../src/tools/MCPAnalogWatchTool.h"
 
 TEST(modbus_crc16_known_value) {
     // Standard Modbus CRC test: slave 1, FC 03, addr 0, count 1
@@ -1246,6 +1254,333 @@ TEST(ultrasonic_read_distance) {
     mcpd::tools::UltrasonicTool::attach(*s, 12, 14);
     String resp = call(s, "distance_read", "{}");
     ASSERT_STR_CONTAINS(resp.c_str(), "distance");
+}
+
+// ── NVS Tool Tests ─────────────────────────────────────────────────────
+
+TEST(nvs_tools_register) {
+    auto* s = makeServer();
+    mcpd::addNVSTools(*s);
+    String resp = s->_processJsonRpc(R"({"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}})");
+
+    ASSERT_STR_CONTAINS(resp.c_str(), "nvs_set");
+    ASSERT_STR_CONTAINS(resp.c_str(), "nvs_get");
+    ASSERT_STR_CONTAINS(resp.c_str(), "nvs_delete");
+    ASSERT_STR_CONTAINS(resp.c_str(), "nvs_list");
+    ASSERT_STR_CONTAINS(resp.c_str(), "nvs_status");
+}
+
+TEST(nvs_set_and_get_string) {
+    auto* s = makeServer();
+    mcpd::tools::NVSTool::store().clear();
+    mcpd::tools::NVSTool::totalOps() = 0;
+    mcpd::addNVSTools(*s);
+    String resp = call(s, "nvs_set", R"({"key":"name","value":"test123"})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "persisted");
+    ASSERT_STR_CONTAINS(resp.c_str(), "test123");
+    resp = call(s, "nvs_get", R"({"key":"name"})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "found\\\":true");
+    ASSERT_STR_CONTAINS(resp.c_str(), "test123");
+}
+
+TEST(nvs_set_and_get_int) {
+    auto* s = makeServer();
+    mcpd::tools::NVSTool::store().clear();
+    mcpd::addNVSTools(*s);
+    String resp = call(s, "nvs_set", R"({"key":"count","value":42})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "42");
+    ASSERT_STR_CONTAINS(resp.c_str(), "int");
+    resp = call(s, "nvs_get", R"({"key":"count"})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "42");
+}
+
+TEST(nvs_get_missing_key) {
+    auto* s = makeServer();
+    mcpd::tools::NVSTool::store().clear();
+    mcpd::addNVSTools(*s);
+    String resp = call(s, "nvs_get", R"({"key":"nonexistent"})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "found\\\":false");
+}
+
+TEST(nvs_delete_key) {
+    auto* s = makeServer();
+    mcpd::tools::NVSTool::store().clear();
+    mcpd::addNVSTools(*s);
+    call(s, "nvs_set", R"({"key":"temp","value":"hello"})");
+    String resp = call(s, "nvs_delete", R"({"key":"temp"})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "deleted\\\":true");
+    resp = call(s, "nvs_get", R"({"key":"temp"})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "found\\\":false");
+}
+
+TEST(nvs_delete_missing_key) {
+    auto* s = makeServer();
+    mcpd::tools::NVSTool::store().clear();
+    mcpd::addNVSTools(*s);
+    String resp = call(s, "nvs_delete", R"({"key":"nope"})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "deleted\\\":false");
+}
+
+TEST(nvs_list_entries) {
+    auto* s = makeServer();
+    mcpd::tools::NVSTool::store().clear();
+    mcpd::addNVSTools(*s);
+    call(s, "nvs_set", R"({"key":"a","value":"1"})");
+    call(s, "nvs_set", R"({"key":"b","value":2})");
+    String resp = call(s, "nvs_list", "{}");
+    ASSERT_STR_CONTAINS(resp.c_str(), "count\\\":2");
+}
+
+TEST(nvs_status) {
+    auto* s = makeServer();
+    mcpd::tools::NVSTool::store().clear();
+    mcpd::tools::NVSTool::totalOps() = 0;
+    mcpd::addNVSTools(*s);
+    call(s, "nvs_set", R"({"key":"x","value":"y"})");
+    String resp = call(s, "nvs_status", "{}");
+    ASSERT_STR_CONTAINS(resp.c_str(), "used_entries\\\":1");
+    ASSERT_STR_CONTAINS(resp.c_str(), "emulated");
+}
+
+TEST(nvs_key_too_long) {
+    auto* s = makeServer();
+    mcpd::tools::NVSTool::store().clear();
+    mcpd::addNVSTools(*s);
+    String resp = call(s, "nvs_set", R"({"key":"1234567890123456","value":"x"})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "too long");
+}
+
+TEST(nvs_set_bool_and_float) {
+    auto* s = makeServer();
+    mcpd::tools::NVSTool::store().clear();
+    mcpd::addNVSTools(*s);
+    String resp = call(s, "nvs_set", R"({"key":"flag","value":true})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "bool");
+    resp = call(s, "nvs_set", R"({"key":"temp","value":23.5})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "float");
+}
+
+// ── Relay Tool Tests ───────────────────────────────────────────────────
+
+TEST(relay_tools_register) {
+    auto* s = makeServer();
+    mcpd::tools::RelayTool::channels().clear();
+    mcpd::addRelayTools(*s);
+    String resp = s->_processJsonRpc(R"({"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}})");
+
+    ASSERT_STR_CONTAINS(resp.c_str(), "relay_set");
+    ASSERT_STR_CONTAINS(resp.c_str(), "relay_get");
+    ASSERT_STR_CONTAINS(resp.c_str(), "relay_toggle");
+    ASSERT_STR_CONTAINS(resp.c_str(), "relay_status");
+}
+
+TEST(relay_add_channel_and_set) {
+    auto* s = makeServer();
+    mcpd::tools::RelayTool::channels().clear();
+    mcpd::addRelayTools(*s);
+    mcpd::addRelayChannel(2, "light", true);
+    String resp = call(s, "relay_set", R"({"channel":0,"state":true})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "light");
+    ASSERT_STR_CONTAINS(resp.c_str(), "true");
+}
+
+TEST(relay_toggle) {
+    auto* s = makeServer();
+    mcpd::tools::RelayTool::channels().clear();
+    mcpd::addRelayTools(*s);
+    mcpd::addRelayChannel(5, "fan", true);
+    call(s, "relay_set", R"({"channel":0,"state":false})");
+    String resp = call(s, "relay_toggle", R"({"channel":0})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "true");
+}
+
+TEST(relay_get_state) {
+    auto* s = makeServer();
+    mcpd::tools::RelayTool::channels().clear();
+    mcpd::addRelayTools(*s);
+    mcpd::addRelayChannel(3, "pump", true);
+    String resp = call(s, "relay_get", R"({"channel":0})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "pump");
+    ASSERT_STR_CONTAINS(resp.c_str(), "OFF"); // starts off
+}
+
+TEST(relay_invalid_channel) {
+    auto* s = makeServer();
+    mcpd::tools::RelayTool::channels().clear();
+    mcpd::addRelayTools(*s);
+    String resp = call(s, "relay_set", R"({"channel":99,"state":true})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "error");
+}
+
+TEST(relay_status_overview) {
+    auto* s = makeServer();
+    mcpd::tools::RelayTool::channels().clear();
+    mcpd::addRelayTools(*s);
+    mcpd::addRelayChannel(2, "heater", true);
+    mcpd::addRelayChannel(3, "cooler", true);
+    String resp = call(s, "relay_status", "{}");
+    ASSERT_STR_CONTAINS(resp.c_str(), "heater");
+    ASSERT_STR_CONTAINS(resp.c_str(), "cooler");
+    ASSERT_STR_CONTAINS(resp.c_str(), "total_channels\\\":2");
+}
+
+TEST(relay_all_off) {
+    auto* s = makeServer();
+    mcpd::tools::RelayTool::channels().clear();
+    mcpd::addRelayTools(*s);
+    mcpd::addRelayChannel(2, "a", true);
+    mcpd::addRelayChannel(3, "b", true);
+    call(s, "relay_set", R"({"channel":0,"state":true})");
+    call(s, "relay_set", R"({"channel":1,"state":true})");
+    String resp = call(s, "relay_all_off", "{}");
+    ASSERT_STR_CONTAINS(resp.c_str(), "turned_off");
+}
+
+// ── UART Tool Tests ────────────────────────────────────────────────────
+
+TEST(uart_tools_register) {
+    auto* s = makeServer();
+    mcpd::tools::UARTTool::attach(*s);
+    String resp = s->_processJsonRpc(R"({"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}})");
+
+    ASSERT_STR_CONTAINS(resp.c_str(), "uart_config");
+    ASSERT_STR_CONTAINS(resp.c_str(), "uart_write");
+    ASSERT_STR_CONTAINS(resp.c_str(), "uart_read");
+    ASSERT_STR_CONTAINS(resp.c_str(), "uart_available");
+}
+
+TEST(uart_config_port1) {
+    auto* s = makeServer();
+    mcpd::tools::UARTTool::attach(*s);
+    String resp = call(s, "uart_config", R"({"port":1,"baud":9600})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "configured\\\":true");
+}
+
+TEST(uart_config_with_pins) {
+    auto* s = makeServer();
+    mcpd::tools::UARTTool::attach(*s);
+    String resp = call(s, "uart_config", R"({"port":1,"baud":115200,"rxPin":16,"txPin":17})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "configured\\\":true");
+    ASSERT_STR_CONTAINS(resp.c_str(), "115200");
+}
+
+TEST(uart_config_invalid_port) {
+    auto* s = makeServer();
+    mcpd::tools::UARTTool::attach(*s);
+    String resp = call(s, "uart_config", R"({"port":5,"baud":9600})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "error");
+}
+
+TEST(uart_write_data) {
+    auto* s = makeServer();
+    mcpd::tools::UARTTool::attach(*s);
+    String resp = call(s, "uart_write", R"({"port":1,"data":"hello"})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "bytesWritten");
+}
+
+TEST(uart_write_hex) {
+    auto* s = makeServer();
+    mcpd::tools::UARTTool::attach(*s);
+    String resp = call(s, "uart_write", R"({"port":1,"hex":"FF01A0"})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "bytesWritten\\\":3");
+}
+
+TEST(uart_write_no_data) {
+    auto* s = makeServer();
+    mcpd::tools::UARTTool::attach(*s);
+    String resp = call(s, "uart_write", R"({"port":1})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "error");
+}
+
+TEST(uart_available) {
+    auto* s = makeServer();
+    mcpd::tools::UARTTool::attach(*s);
+    String resp = call(s, "uart_available", R"({"port":1})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "available");
+}
+
+TEST(uart_read_empty) {
+    auto* s = makeServer();
+    mcpd::tools::UARTTool::attach(*s);
+    Serial1._setRxBuffer("");
+    String resp = call(s, "uart_read", R"({"port":1,"timeout":0})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "bytesRead\\\":0");
+}
+
+TEST(uart_read_with_data) {
+    auto* s = makeServer();
+    mcpd::tools::UARTTool::attach(*s);
+    Serial1._setRxBuffer("ABC");
+    String resp = call(s, "uart_read", R"({"port":1,"maxBytes":10,"timeout":0})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "bytesRead\\\":3");
+    ASSERT_STR_CONTAINS(resp.c_str(), "ABC");
+}
+
+// ── Timer Tool Tests ───────────────────────────────────────────────────
+
+TEST(timer_tools_register) {
+    auto* s = makeServer();
+    mcpd::registerTimerTools(*s);
+    String resp = s->_processJsonRpc(R"({"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}})");
+
+    ASSERT_STR_CONTAINS(resp.c_str(), "timer_start");
+    ASSERT_STR_CONTAINS(resp.c_str(), "timer_stop");
+    ASSERT_STR_CONTAINS(resp.c_str(), "timer_status");
+    ASSERT_STR_CONTAINS(resp.c_str(), "timer_millis");
+    ASSERT_STR_CONTAINS(resp.c_str(), "timer_pulse_in");
+}
+
+TEST(timer_start_and_status) {
+    auto* s = makeServer();
+    mcpd::registerTimerTools(*s);
+    String resp = call(s, "timer_start", R"({"timer_id":0,"interval_us":1000})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "started");
+    resp = call(s, "timer_status", R"({"timer_id":0})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "active\\\":true");
+}
+
+TEST(timer_stop) {
+    auto* s = makeServer();
+    mcpd::registerTimerTools(*s);
+    call(s, "timer_start", R"({"timer_id":1,"interval_us":500})");
+    String resp = call(s, "timer_stop", R"({"timer_id":1})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "stopped");
+}
+
+TEST(timer_invalid_id) {
+    auto* s = makeServer();
+    mcpd::registerTimerTools(*s);
+    String resp = call(s, "timer_start", R"({"timer_id":5,"interval_us":1000})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "error");
+}
+
+TEST(timer_millis_returns_timestamps) {
+    auto* s = makeServer();
+    mcpd::registerTimerTools(*s);
+    String resp = call(s, "timer_millis", "{}");
+    ASSERT_STR_CONTAINS(resp.c_str(), "millis");
+    ASSERT_STR_CONTAINS(resp.c_str(), "micros");
+}
+
+TEST(timer_pulse_in) {
+    auto* s = makeServer();
+    mcpd::registerTimerTools(*s);
+    String resp = call(s, "timer_pulse_in", R"({"pin":12,"level":1})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "pulse_us");
+    // pulseIn mock returns 500, so HC-SR04 distance should be there
+    ASSERT_STR_CONTAINS(resp.c_str(), "hc_sr04_cm");
+}
+
+// ── Analog Watch Tool Tests ────────────────────────────────────────────
+
+TEST(analog_watch_tools_register) {
+    auto* s = makeServer();
+    mcpd::addAnalogWatchTools(*s);
+    String resp = s->_processJsonRpc(R"({"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}})");
+
+    ASSERT_STR_CONTAINS(resp.c_str(), "analog_watch_set");
+    ASSERT_STR_CONTAINS(resp.c_str(), "analog_watch_status");
+    ASSERT_STR_CONTAINS(resp.c_str(), "analog_watch_clear");
 }
 
 // ── Main ───────────────────────────────────────────────────────────────

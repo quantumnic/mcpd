@@ -53,7 +53,7 @@ inline void registerTimerTools(Server& server) {
             "timer_start",
             "Start a hardware timer. ESP32 has timers 0-3. "
             "Can be periodic (repeating) or one-shot. Tracks fire count.",
-            R"({
+            R"=({
                 "type":"object",
                 "properties":{
                     "timer_id":{"type":"integer","minimum":0,"maximum":3,"description":"Timer number (0-3)"},
@@ -61,7 +61,7 @@ inline void registerTimerTools(Server& server) {
                     "oneshot":{"type":"boolean","description":"If true, fires once then stops (default false)"}
                 },
                 "required":["timer_id","interval_us"]
-            })",
+            })=",
             [](const JsonObject& args) -> String {
                 int id = args["timer_id"].as<int>();
                 if (id < 0 || id > 3) return R"({"error":"timer_id must be 0-3"})";
@@ -109,13 +109,13 @@ inline void registerTimerTools(Server& server) {
         MCPTool tool(
             "timer_stop",
             "Stop a running hardware timer.",
-            R"({
+            R"=({
                 "type":"object",
                 "properties":{
                     "timer_id":{"type":"integer","minimum":0,"maximum":3,"description":"Timer number (0-3)"}
                 },
                 "required":["timer_id"]
-            })",
+            })=",
             [](const JsonObject& args) -> String {
                 int id = args["timer_id"].as<int>();
                 if (id < 0 || id > 3) return R"({"error":"timer_id must be 0-3"})";
@@ -149,14 +149,14 @@ inline void registerTimerTools(Server& server) {
         MCPTool tool(
             "timer_status",
             "Read the status and fire count of a hardware timer.",
-            R"({
+            R"=({
                 "type":"object",
                 "properties":{
                     "timer_id":{"type":"integer","minimum":0,"maximum":3,"description":"Timer number (0-3)"},
                     "reset_count":{"type":"boolean","description":"Reset fire count after reading (default false)"}
                 },
                 "required":["timer_id"]
-            })",
+            })=",
             [](const JsonObject& args) -> String {
                 int id = args["timer_id"].as<int>();
                 if (id < 0 || id > 3) return R"({"error":"timer_id must be 0-3"})";
@@ -208,7 +208,7 @@ inline void registerTimerTools(Server& server) {
             "timer_pulse_in",
             "Measure pulse width on a GPIO pin (like Arduino pulseIn). "
             "Useful for ultrasonic sensors (HC-SR04), IR receivers, etc.",
-            R"({
+            R"=({
                 "type":"object",
                 "properties":{
                     "pin":{"type":"integer","description":"GPIO pin number"},
@@ -216,7 +216,7 @@ inline void registerTimerTools(Server& server) {
                     "timeout_us":{"type":"integer","description":"Timeout in microseconds (default 1000000 = 1s)","minimum":1}
                 },
                 "required":["pin","level"]
-            })",
+            })=",
             [](const JsonObject& args) -> String {
                 int pin = args["pin"].as<int>();
                 int level = args["level"].as<int>();

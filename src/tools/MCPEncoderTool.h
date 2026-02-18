@@ -114,7 +114,7 @@ inline int addEncoderTools(Server& server, int pinA, int pinB, int pinButton = -
         MCPTool readTool;
         readTool.name = "encoder_read";
         readTool.description = "Read rotary encoder position, direction, speed, and button state.";
-        readTool.inputSchemaJson = R"({
+        readTool.inputSchemaJson = R"=({
             "type": "object",
             "properties": {
                 "index": {
@@ -125,7 +125,7 @@ inline int addEncoderTools(Server& server, int pinA, int pinB, int pinButton = -
                     "maximum": 3
                 }
             }
-        })";
+        })=";
         readTool.annotations.title = "Read Encoder";
         readTool.annotations.readOnlyHint = true;
 
@@ -174,7 +174,7 @@ inline int addEncoderTools(Server& server, int pinA, int pinB, int pinButton = -
         MCPTool resetTool;
         resetTool.name = "encoder_reset";
         resetTool.description = "Reset encoder position to zero or a specified value.";
-        resetTool.inputSchemaJson = R"({
+        resetTool.inputSchemaJson = R"=({
             "type": "object",
             "properties": {
                 "index": {
@@ -188,7 +188,7 @@ inline int addEncoderTools(Server& server, int pinA, int pinB, int pinButton = -
                     "default": 0
                 }
             }
-        })";
+        })=";
         resetTool.annotations.title = "Reset Encoder";
         resetTool.annotations.readOnlyHint = false;
 
@@ -217,7 +217,7 @@ inline int addEncoderTools(Server& server, int pinA, int pinB, int pinButton = -
         MCPTool configTool;
         configTool.name = "encoder_config";
         configTool.description = "Configure encoder: steps per revolution, position limits.";
-        configTool.inputSchemaJson = R"({
+        configTool.inputSchemaJson = R"=({
             "type": "object",
             "properties": {
                 "index": {
@@ -239,7 +239,7 @@ inline int addEncoderTools(Server& server, int pinA, int pinB, int pinButton = -
                     "description": "Maximum position limit (omit for no limit)"
                 }
             }
-        })";
+        })=";
         configTool.annotations.title = "Configure Encoder";
         configTool.annotations.readOnlyHint = false;
 

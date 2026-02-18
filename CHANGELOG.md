@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.23.0] - 2026-02-18
+
+### Fixed
+- Raw string literal delimiters in NVS, Relay, UART, Timer, Power, Touch, Encoder, PulseCounter, AnalogWatch tool schemas now use `R"=(...)="` to prevent premature termination when descriptions contain parentheses
+- Fixed `bool` conversion ambiguity in NVS tool (`args["value"]` now uses explicit `as<bool>()`)
+
+### Tests
+- Added 34 new tests covering previously untested tools:
+  - 10 NVS tool tests (set/get string/int/bool/float, delete, list, status, key validation)
+  - 7 Relay tool tests (register, set, toggle, get, invalid channel, status, all-off)
+  - 10 UART tool tests (register, config, pins, invalid port, write data/hex, read empty/data, available)
+  - 6 Timer tool tests (register, start/status, stop, invalid ID, millis, pulse_in)
+  - 1 Analog Watch tool registration test
+- Expanded Arduino mock with: HardwareSerial, interrupt functions (attach/detach/noInterrupts), hw_timer_t, touch, power/sleep stubs, constrain(), equalsIgnoreCase(), advancing millis()
+- Expanded ArduinoJson mock with: `as<String>`, `as<unsigned int>`, `is<double>`, `is<long>` specializations
+- Total native tests: 393 (was 359)
+
 ## [0.22.0] - 2026-02-18
 
 ### Added

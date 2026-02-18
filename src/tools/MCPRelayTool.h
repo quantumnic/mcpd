@@ -145,7 +145,7 @@ public:
     static void attach(Server& server) {
         // relay_set — turn relay on or off
         server.addTool("relay_set", "Turn a relay channel ON or OFF. Use channel index or label.",
-            R"({"type":"object","properties":{"channel":{"type":"integer","description":"Relay channel index (0-based)"},"label":{"type":"string","description":"Relay label (alternative to channel index)"},"state":{"type":"string","enum":["on","off"],"description":"Desired state"}},"required":["state"]})",
+            R"=({"type":"object","properties":{"channel":{"type":"integer","description":"Relay channel index (0-based)"},"label":{"type":"string","description":"Relay label (alternative to channel index)"},"state":{"type":"string","enum":["on","off"],"description":"Desired state"}},"required":["state"]})=",
             [](const JsonObject& args) -> String {
                 int idx = resolveIndex(args);
                 if (idx < 0 || idx >= (int)channels().size())
@@ -180,7 +180,7 @@ public:
 
         // relay_pulse — briefly activate a relay
         server.addTool("relay_pulse", "Pulse a relay ON for a specified duration then auto-OFF",
-            R"({"type":"object","properties":{"channel":{"type":"integer","description":"Relay channel index"},"label":{"type":"string","description":"Relay label"},"duration_ms":{"type":"integer","minimum":50,"maximum":30000,"description":"Pulse duration in milliseconds (50-30000)"}},"required":["duration_ms"]})",
+            R"=({"type":"object","properties":{"channel":{"type":"integer","description":"Relay channel index"},"label":{"type":"string","description":"Relay label"},"duration_ms":{"type":"integer","minimum":50,"maximum":30000,"description":"Pulse duration in milliseconds (50-30000)"}},"required":["duration_ms"]})=",
             [](const JsonObject& args) -> String {
                 int idx = resolveIndex(args);
                 if (idx < 0 || idx >= (int)channels().size())

@@ -73,12 +73,12 @@ inline void addAnalogWatchTools(Server& server) {
     // analog_watch_set — configure threshold monitoring
     server.addTool(
         MCPTool("analog_watch_set", "Set up analog threshold monitoring on a pin",
-            R"({"type":"object","properties":{
+            R"=({"type":"object","properties":{
                 "pin":{"type":"integer","description":"Analog pin number"},
                 "low":{"type":"integer","description":"Low threshold (trigger if reading below this)","default":0},
                 "high":{"type":"integer","description":"High threshold (trigger if reading above this)","default":4095},
                 "label":{"type":"string","description":"Human-readable label for this watch"}
-            },"required":["pin"]})",
+            },"required":["pin"]})=",
             [](const JsonObject& args) -> String {
                 int pin = args["pin"] | -1;
                 if (pin < 0) return R"({"error":"Pin number required"})";

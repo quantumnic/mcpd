@@ -122,6 +122,18 @@ public:
 
     bool operator<(const String& rhs) const { return _s < rhs._s; }
 
+    bool equalsIgnoreCase(const String& other) const {
+        if (_s.size() != other._s.size()) return false;
+        for (size_t i = 0; i < _s.size(); i++) {
+            if (tolower(_s[i]) != tolower(other._s[i])) return false;
+        }
+        return true;
+    }
+
+    int toInt() const { return std::atoi(_s.c_str()); }
+    float toFloat() const { return std::atof(_s.c_str()); }
+    double toDouble() const { return std::strtod(_s.c_str(), nullptr); }
+
     void replace(const String& find, const String& repl) {
         size_t pos = 0;
         while ((pos = _s.find(find._s, pos)) != std::string::npos) {
@@ -136,6 +148,7 @@ public:
     String operator+(const String& rhs) const { return String(_s + rhs._s); }
     String operator+(const char* rhs) const { return String(_s + (rhs ? rhs : "")); }
     String operator+(int v) const { return String(_s + std::to_string(v)); }
+    String operator+(unsigned int v) const { return String(_s + std::to_string(v)); }
     String operator+(unsigned long v) const { return String(_s + std::to_string(v)); }
     String operator+(float v) const { return String(_s + std::to_string(v)); }
     String& operator+=(const String& rhs) { _s += rhs._s; return *this; }
@@ -170,6 +183,7 @@ inline void pinMode(int pin, int mode) { _mockPinModes()[pin] = mode; }
 inline void digitalWrite(int pin, int value) { _mockPinValues()[pin] = value; }
 inline int digitalRead(int pin) { return _mockPinValues().count(pin) ? _mockPinValues()[pin] : 0; }
 inline int analogRead(int pin) { return _mockAnalogValues().count(pin) ? _mockAnalogValues()[pin] : 0; }
+inline long constrain(long x, long lo, long hi) { return x < lo ? lo : (x > hi ? hi : x); }
 inline long map(long x, long in_min, long in_max, long out_min, long out_max) {
     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
@@ -182,8 +196,9 @@ inline void ledcDetachPin(int pin) {}
 
 // ── Timing ─────────────────────────────────────────────────────────────
 
-inline unsigned long millis() { return 12345; }
-inline void delay(unsigned long ms) {}
+inline unsigned long& _mockMillis() { static unsigned long m = 12345; return m; }
+inline unsigned long millis() { return _mockMillis()++; }
+inline void delay(unsigned long ms) { _mockMillis() += ms; }
 inline void delayMicroseconds(unsigned int us) { (void)us; }
 inline void tone(int pin, unsigned int frequency, unsigned long duration = 0) { (void)pin; (void)frequency; (void)duration; }
 inline void noTone(int pin) { (void)pin; }
@@ -194,6 +209,98 @@ inline unsigned long pulseIn(int pin, int state, unsigned long timeout = 1000000
 inline void randomSeed(unsigned long seed) {}
 inline long random(long max) { return rand() % max; }
 inline long random(long min, long max) { return min + rand() % (max - min); }
+
+// ── Interrupt Mock ──────────────────────────────────────────────────────
+
+#define RISING    1
+#define FALLING   2
+#define CHANGE    3
+#define IRAM_ATTR
+
+inline int digitalPinToInterrupt(int pin) { return pin; }
+
+// Store attached interrupt handlers for testing
+inline std::map<int, std::function<void()>>& _mockInterruptHandlers() {
+    static std::map<int, std::function<void()>> m;
+    return m;
+}
+
+inline void attachInterrupt(int pin, void (*isr)(), int mode) {
+    _mockInterruptHandlers()[pin] = isr;
+}
+
+inline void detachInterrupt(int pin) {
+    _mockInterruptHandlers().erase(pin);
+}
+
+inline void noInterrupts() {}
+inline void interrupts() {}
+
+// ── Touch Mock ─────────────────────────────────────────────────────────
+
+inline std::map<int, uint16_t>& _mockTouchValues() {
+    static std::map<int, uint16_t> m;
+    return m;
+}
+inline uint16_t touchRead(int pin) {
+    return _mockTouchValues().count(pin) ? _mockTouchValues()[pin] : 50;
+}
+
+// ── Timer Mock ─────────────────────────────────────────────────────────
+
+struct hw_timer_t {};
+inline hw_timer_t _mockTimers[4];
+inline hw_timer_t* timerBegin(int num, int divider, bool countUp) {
+    (void)divider; (void)countUp;
+    return &_mockTimers[num];
+}
+inline void timerAttachInterrupt(hw_timer_t* t, void (*fn)(), bool edge) { (void)t; (void)fn; (void)edge; }
+inline void timerAlarmWrite(hw_timer_t* t, uint64_t val, bool autoreload) { (void)t; (void)val; (void)autoreload; }
+inline void timerAlarmEnable(hw_timer_t* t) { (void)t; }
+inline void timerAlarmDisable(hw_timer_t* t) { (void)t; }
+inline void timerDetachInterrupt(hw_timer_t* t) { (void)t; }
+inline void timerEnd(hw_timer_t* t) { (void)t; }
+
+inline unsigned long micros() { return 12345000; }
+
+// ── Power/Sleep Mock ───────────────────────────────────────────────────
+
+inline void esp_sleep_enable_timer_wakeup(uint64_t us) { (void)us; }
+inline void esp_deep_sleep_start() {}
+inline void esp_light_sleep_start() {}
+inline void esp_restart() {}
+inline int esp_sleep_get_wakeup_cause() { return 0; }
+
+// ── HardwareSerial Mock ────────────────────────────────────────────────
+
+#define SERIAL_8N1 0x800001c
+
+struct HardwareSerial {
+    std::string _rxBuffer;
+    size_t _rxPos = 0;
+    unsigned long _timeout = 1000;
+
+    void begin(long baud) { (void)baud; }
+    void begin(long baud, int config, int rxPin, int txPin) { (void)baud; (void)config; (void)rxPin; (void)txPin; }
+    void end() {}
+    void setTimeout(unsigned long t) { _timeout = t; }
+    int available() { return (int)(_rxBuffer.size() - _rxPos); }
+    int read() {
+        if (_rxPos < _rxBuffer.size()) return (unsigned char)_rxBuffer[_rxPos++];
+        return -1;
+    }
+    size_t write(uint8_t b) { (void)b; return 1; }
+    size_t print(const String& s) { return s.length(); }
+    size_t print(const char* s) { return strlen(s); }
+    template<typename... Args>
+    void printf(const char* fmt, Args... args) { (void)fmt; }
+
+    // Test helper
+    void _setRxBuffer(const std::string& data) { _rxBuffer = data; _rxPos = 0; }
+};
+
+inline HardwareSerial Serial1;
+inline HardwareSerial Serial2;
 
 // ── Serial Mock ────────────────────────────────────────────────────────
 
@@ -210,15 +317,22 @@ inline SerialMock Serial;
 
 // ── ESP Mock ───────────────────────────────────────────────────────────
 
+typedef int esp_reset_reason_t;
+#define ESP_RST_POWERON 1
+
 struct ESPMock {
     uint32_t getFreeHeap() { return 200000; }
+    uint32_t getMinFreeHeap() { return 150000; }
     uint32_t getHeapSize() { return 320000; }
     const char* getChipModel() { return "ESP32-MOCK"; }
     int getChipRevision() { return 1; }
     int getCpuFreqMHz() { return 240; }
     uint32_t getFlashChipSize() { return 4194304; }
+    const char* getSdkVersion() { return "mock-sdk-1.0"; }
 };
 inline ESPMock ESP;
+
+inline esp_reset_reason_t esp_reset_reason() { return ESP_RST_POWERON; }
 
 inline uint32_t esp_random() { return (uint32_t)rand(); }
 

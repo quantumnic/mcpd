@@ -484,6 +484,23 @@ template<> inline bool JsonVariant::is<JsonVariant>() const {
     return _node && _node->type != JsonNodeType::Null;
 }
 
+template<> inline String JsonVariant::as<String>() const {
+    const char* s = as<const char*>();
+    return s ? String(s) : String("");
+}
+
+template<> inline unsigned int JsonVariant::as<unsigned int>() const {
+    return (unsigned int)as<int>();
+}
+
+template<> inline bool JsonVariant::is<double>() const {
+    return is<float>();
+}
+
+template<> inline bool JsonVariant::is<long>() const {
+    return is<int>();
+}
+
 // ── Template specializations for to<T> ─────────────────────────────────
 
 template<> inline JsonObject JsonVariant::to<JsonObject>() {
