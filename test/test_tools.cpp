@@ -727,6 +727,192 @@ TEST(i2s_tools_register_all_six) {
     ASSERT_STR_CONTAINS(resp.c_str(), "i2s_stop");
 }
 
+// ── Modbus Tool Tests ──────────────────────────────────────────────────
+
+#include "../src/tools/MCPModbusTool.h"
+
+TEST(modbus_crc16_known_value) {
+    // Standard Modbus CRC test: slave 1, FC 03, addr 0, count 1
+    uint8_t frame[] = {0x01, 0x03, 0x00, 0x00, 0x00, 0x01};
+    uint16_t crc = mcpd::tools::_modbusCRC16(frame, 6);
+    // Known CRC for this frame: 0x0A84
+    ASSERT_EQ(crc, (uint16_t)0x0A84);
+}
+
+TEST(modbus_crc16_empty) {
+    uint16_t crc = mcpd::tools::_modbusCRC16(nullptr, 0);
+    ASSERT_EQ(crc, (uint16_t)0xFFFF);
+}
+
+TEST(modbus_crc16_single_byte) {
+    uint8_t data[] = {0x01};
+    uint16_t crc = mcpd::tools::_modbusCRC16(data, 1);
+    // CRC of single byte 0x01 = 0x807E
+    ASSERT_EQ(crc, (uint16_t)0x807E);
+}
+
+TEST(modbus_exception_names) {
+    ASSERT_STR_CONTAINS(mcpd::tools::_modbusExceptionName(1), "ILLEGAL_FUNCTION");
+    ASSERT_STR_CONTAINS(mcpd::tools::_modbusExceptionName(2), "ILLEGAL_DATA_ADDRESS");
+    ASSERT_STR_CONTAINS(mcpd::tools::_modbusExceptionName(3), "ILLEGAL_DATA_VALUE");
+    ASSERT_STR_CONTAINS(mcpd::tools::_modbusExceptionName(4), "SLAVE_DEVICE_FAILURE");
+    ASSERT_STR_CONTAINS(mcpd::tools::_modbusExceptionName(99), "UNKNOWN");
+}
+
+TEST(modbus_init_rtu) {
+    auto* s = makeServer();
+    mcpd::tools::_modbusMode = mcpd::tools::ModbusMode::NONE;
+    mcpd::tools::ModbusTool::attach(*s);
+    String resp = call(s, "modbus_init", R"({"mode":"rtu","baud":19200,"dePin":4})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "rtu");
+    ASSERT_STR_CONTAINS(resp.c_str(), "19200");
+    ASSERT_STR_CONTAINS(resp.c_str(), "ok");
+}
+
+TEST(modbus_init_tcp) {
+    auto* s = makeServer();
+    mcpd::tools::_modbusMode = mcpd::tools::ModbusMode::NONE;
+    mcpd::tools::ModbusTool::attach(*s);
+    String resp = call(s, "modbus_init", R"({"mode":"tcp","host":"10.0.0.1","port":502})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "tcp");
+    ASSERT_STR_CONTAINS(resp.c_str(), "10.0.0.1");
+    ASSERT_STR_CONTAINS(resp.c_str(), "502");
+}
+
+TEST(modbus_init_invalid_mode) {
+    auto* s = makeServer();
+    mcpd::tools::_modbusMode = mcpd::tools::ModbusMode::NONE;
+    mcpd::tools::ModbusTool::attach(*s);
+    String resp = call(s, "modbus_init", R"({"mode":"invalid"})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "Invalid mode");
+}
+
+TEST(modbus_read_coils_not_initialized) {
+    auto* s = makeServer();
+    mcpd::tools::_modbusMode = mcpd::tools::ModbusMode::NONE;
+    mcpd::tools::ModbusTool::attach(*s);
+    String resp = call(s, "modbus_read_coils", R"({"slaveId":1,"address":0,"count":8})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "not initialized");
+}
+
+TEST(modbus_read_coils_success) {
+    auto* s = makeServer();
+    mcpd::tools::_modbusMode = mcpd::tools::ModbusMode::RTU;
+    mcpd::tools::_modbusStats = mcpd::tools::ModbusStats{};
+    mcpd::tools::ModbusTool::attach(*s);
+    String resp = call(s, "modbus_read_coils", R"({"slaveId":1,"address":0,"count":8})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "fc");
+    ASSERT_STR_CONTAINS(resp.c_str(), "coils");
+    ASSERT_STR_CONTAINS(resp.c_str(), "slaveId");
+}
+
+TEST(modbus_read_coils_count_validation) {
+    auto* s = makeServer();
+    mcpd::tools::_modbusMode = mcpd::tools::ModbusMode::RTU;
+    mcpd::tools::ModbusTool::attach(*s);
+    String resp = call(s, "modbus_read_coils", R"({"slaveId":1,"address":0,"count":5000})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "Count must be 1-2000");
+}
+
+TEST(modbus_read_holding_success) {
+    auto* s = makeServer();
+    mcpd::tools::_modbusMode = mcpd::tools::ModbusMode::RTU;
+    mcpd::tools::_modbusStats = mcpd::tools::ModbusStats{};
+    mcpd::tools::ModbusTool::attach(*s);
+    String resp = call(s, "modbus_read_holding", R"({"slaveId":2,"address":100,"count":5,"format":"float32"})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "fc");
+    ASSERT_STR_CONTAINS(resp.c_str(), "registers");
+    ASSERT_STR_CONTAINS(resp.c_str(), "float32");
+}
+
+TEST(modbus_read_holding_count_validation) {
+    auto* s = makeServer();
+    mcpd::tools::_modbusMode = mcpd::tools::ModbusMode::RTU;
+    mcpd::tools::ModbusTool::attach(*s);
+    String resp = call(s, "modbus_read_holding", R"({"slaveId":1,"address":0,"count":200})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "Count must be 1-125");
+}
+
+TEST(modbus_write_coil_success) {
+    auto* s = makeServer();
+    mcpd::tools::_modbusMode = mcpd::tools::ModbusMode::RTU;
+    mcpd::tools::_modbusStats = mcpd::tools::ModbusStats{};
+    mcpd::tools::ModbusTool::attach(*s);
+    String resp = call(s, "modbus_write_coil", R"({"slaveId":1,"address":0,"value":true})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "true");
+    ASSERT_STR_CONTAINS(resp.c_str(), "fc");
+}
+
+TEST(modbus_write_register_success) {
+    auto* s = makeServer();
+    mcpd::tools::_modbusMode = mcpd::tools::ModbusMode::RTU;
+    mcpd::tools::_modbusStats = mcpd::tools::ModbusStats{};
+    mcpd::tools::ModbusTool::attach(*s);
+    String resp = call(s, "modbus_write_register", R"({"slaveId":1,"address":40001,"value":1500})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "1500");
+    ASSERT_STR_CONTAINS(resp.c_str(), "fc");
+}
+
+TEST(modbus_write_registers_success) {
+    auto* s = makeServer();
+    mcpd::tools::_modbusMode = mcpd::tools::ModbusMode::RTU;
+    mcpd::tools::_modbusStats = mcpd::tools::ModbusStats{};
+    mcpd::tools::ModbusTool::attach(*s);
+    String resp = call(s, "modbus_write_registers", R"({"slaveId":1,"address":0,"values":[100,200,300]})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "count");
+    ASSERT_STR_CONTAINS(resp.c_str(), "3");
+}
+
+TEST(modbus_scan_success) {
+    auto* s = makeServer();
+    mcpd::tools::_modbusMode = mcpd::tools::ModbusMode::RTU;
+    mcpd::tools::ModbusTool::attach(*s);
+    String resp = call(s, "modbus_scan", R"({"startAddr":1,"endAddr":10})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "scanning");
+    ASSERT_STR_CONTAINS(resp.c_str(), "found");
+}
+
+TEST(modbus_scan_not_initialized) {
+    auto* s = makeServer();
+    mcpd::tools::_modbusMode = mcpd::tools::ModbusMode::NONE;
+    mcpd::tools::ModbusTool::attach(*s);
+    String resp = call(s, "modbus_scan", R"({})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "not initialized");
+}
+
+TEST(modbus_status_counters) {
+    auto* s = makeServer();
+    mcpd::tools::_modbusMode = mcpd::tools::ModbusMode::RTU;
+    mcpd::tools::_modbusStats = mcpd::tools::ModbusStats{};
+    mcpd::tools::_modbusStats.requests = 42;
+    mcpd::tools::_modbusStats.responses = 40;
+    mcpd::tools::_modbusStats.timeouts = 2;
+    mcpd::tools::ModbusTool::attach(*s);
+    String resp = call(s, "modbus_status", R"({})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "rtu");
+    ASSERT_STR_CONTAINS(resp.c_str(), "42");
+    ASSERT_STR_CONTAINS(resp.c_str(), "40");
+    ASSERT_STR_CONTAINS(resp.c_str(), "timeouts");
+}
+
+TEST(modbus_tools_register_all_eleven) {
+    auto* s = makeServer();
+    mcpd::tools::ModbusTool::attach(*s);
+    String req = R"({"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}})";
+    String resp = s->_processJsonRpc(req);
+    ASSERT_STR_CONTAINS(resp.c_str(), "modbus_init");
+    ASSERT_STR_CONTAINS(resp.c_str(), "modbus_read_coils");
+    ASSERT_STR_CONTAINS(resp.c_str(), "modbus_read_discrete");
+    ASSERT_STR_CONTAINS(resp.c_str(), "modbus_read_holding");
+    ASSERT_STR_CONTAINS(resp.c_str(), "modbus_read_input");
+    ASSERT_STR_CONTAINS(resp.c_str(), "modbus_write_coil");
+    ASSERT_STR_CONTAINS(resp.c_str(), "modbus_write_register");
+    ASSERT_STR_CONTAINS(resp.c_str(), "modbus_write_coils");
+    ASSERT_STR_CONTAINS(resp.c_str(), "modbus_write_registers");
+    ASSERT_STR_CONTAINS(resp.c_str(), "modbus_scan");
+    ASSERT_STR_CONTAINS(resp.c_str(), "modbus_status");
+}
+
 // ── Main ───────────────────────────────────────────────────────────────
 
 int main() {

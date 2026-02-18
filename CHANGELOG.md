@@ -2,6 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.21.0] - 2026-02-18
+
+### Added
+- **Modbus RTU/TCP Tool** (`tools/MCPModbusTool.h`) — industrial protocol support for PLCs, sensors, and equipment:
+  - `modbus_init` — initialize as RTU master (serial/RS-485) or TCP master (Ethernet/WiFi)
+  - `modbus_read_coils` — read coil status (FC 01), up to 2000 coils
+  - `modbus_read_discrete` — read discrete inputs (FC 02)
+  - `modbus_read_holding` — read holding registers (FC 03) with format options (uint16, int16, uint32, int32, float32, hex)
+  - `modbus_read_input` — read input registers (FC 04)
+  - `modbus_write_coil` — write single coil (FC 05)
+  - `modbus_write_register` — write single holding register (FC 06)
+  - `modbus_write_coils` — write multiple coils (FC 15)
+  - `modbus_write_registers` — write multiple holding registers (FC 16)
+  - `modbus_scan` — scan bus for responding devices (addresses 1-247)
+  - `modbus_status` — connection status and error counters (requests, responses, timeouts, CRC errors, exceptions)
+  - CRC-16/Modbus implementation
+  - RS-485 direction enable (DE) pin support
+  - Modbus exception code decoding
+- **Modbus Gateway Example** (`examples/modbus_gateway/`) — full industrial gateway with:
+  - RS-485 Modbus RTU master setup
+  - Device map resource and register map resource template
+  - Diagnostic prompt for bus health checks
+  - WiFi + System tool integration
+
+### Tests
+- Added 20 Modbus tool tests (CRC verification, init modes, read/write operations, validation, scanning, status counters, tool registration)
+- Added 30 Camera tool tests (base64 encoding, non-ESP32 fallback, tool registration)
+- Added 11 ESP-NOW tool tests (MAC parsing, non-ESP32 fallback, tool registration)
+- Added 8 LoRa tool tests (non-ESP32 fallback, tool registration)
+- Added 10 I2S Audio tool tests (base64 encoding, non-ESP32 fallback, tool registration)
+- Total test count: 323 (was 304)
+
 ## [0.20.0] - 2026-02-18
 
 ### Added

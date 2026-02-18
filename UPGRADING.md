@@ -1,5 +1,21 @@
 # Upgrading mcpd
 
+## From 0.20.x to 0.21.0
+
+**No breaking changes.** Drop-in upgrade.
+
+### New tools (opt-in)
+
+```cpp
+#include <mcpd.h>
+#include <tools/MCPModbusTool.h>
+
+mcpd::Server mcp("my-device");
+mcpd::tools::ModbusTool::attach(mcp);
+```
+
+Modbus RTU requires a UART connection with RS-485 transceiver. Modbus TCP requires WiFi/Ethernet.
+
 ## From 0.18.x to 0.19.0
 
 **No breaking changes.** Drop-in upgrade.
