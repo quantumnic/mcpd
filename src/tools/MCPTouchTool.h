@@ -45,10 +45,12 @@ static int _touchPadCount = 0;
 inline void addTouchTools(Server& server, const int* gpios, int count,
                           const char** labels = nullptr) {
     // Map GPIO → touch number
-    static const int gpioToTouch[] = {
+    static const int gpioToTouch[34] = {
         // GPIO: touch#  (-1 = not a touch pin)
-        [0] = 1, [2] = 2, [4] = 0, [12] = 5, [13] = 4,
-        [14] = 6, [15] = 3, [27] = 7, [32] = 9, [33] = 8
+        // Index:  0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
+                   1, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 4, 6, 3,
+        // Index: 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33
+                   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 9, 8
     };
 
     for (int i = 0; i < count && _touchPadCount < 10; i++) {

@@ -16,6 +16,7 @@
 #define MCPD_ENCODER_TOOL_H
 
 #include "../MCPTool.h"
+#include <climits>
 
 namespace mcpd {
 
