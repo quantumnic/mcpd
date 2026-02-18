@@ -2,6 +2,39 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2026-02-18
+
+### Added
+- **STM32 Platform HAL** (`STM32Platform.h`) — full hardware abstraction for STM32 boards
+  - WiFi, GPIO, System HAL implementations for STM32duino framework
+  - Supports STM32F1xx (Blue Pill), STM32F4xx (Nucleo), STM32H7xx
+  - Hardware RNG support where available, 96-bit unique device ID
+  - Configurable analog resolution, PWM via HardwareTimer
+- **Resource Subscriptions** (`resources/subscribe`, `resources/unsubscribe`)
+  - Clients can subscribe to resource URIs for change notifications
+  - `notifyResourceUpdated(uri)` sends `notifications/resources/updated` to subscribers
+  - `subscribe: true` advertised in resources capability
+  - Idempotent subscribe (no duplicates)
+- **Completion/Autocomplete** (`completion/complete`)
+  - `CompletionManager` for registering completion providers
+  - Supports `ref/prompt` argument completion
+  - Supports `ref/resource` template variable completion
+  - Prefix filtering and `hasMore` truncation support
+  - Capability advertised in `initialize` when providers registered
+- **Built-in SPI Tool** (`MCPSPITool.h`)
+  - `spi_transfer` — send/receive bytes with configurable CS pin, frequency, mode, bit order
+  - `spi_config` — initialize SPI bus with optional custom pins (ESP32)
+  - Transfer size limit (256 bytes) for MCU memory safety
+- New example: `industrial_monitor` — industrial process monitoring with tank level,
+  temperature, valve control, alarms, subscriptions, completion, and prompts
+- 13 new unit tests (50 unit + 15 HTTP = 65 total)
+
+### Changed
+- Bumped version to 0.4.0
+- README: updated feature comparison table, architecture diagram
+- Built-in tool count: 9 → 10 (added SPI)
+- Platform support: ESP32, RP2040 → ESP32, RP2040, STM32
+
 ## [0.3.0] - 2026-02-18
 
 ### Added

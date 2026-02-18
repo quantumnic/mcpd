@@ -424,10 +424,169 @@ TEST(logging_filters_by_level) {
 TEST(empty_body_parse_error) {
     auto* s = makeTestServer();
     String req = "";
-    // Empty body would be caught at HTTP layer, but processJsonRpc handles it too
     String resp = s->_processJsonRpc(req);
-    // ArduinoJson will fail to parse empty string
     ASSERT_STR_CONTAINS(resp.c_str(), "error");
+}
+
+// ── Resource subscription tests ───────────────────────────────────────
+
+TEST(resources_subscribe) {
+    auto* s = makeTestServer();
+    String req = R"({"jsonrpc":"2.0","id":70,"method":"resources/subscribe","params":{"uri":"test://data"}})";
+    String resp = s->_processJsonRpc(req);
+    ASSERT_STR_CONTAINS(resp.c_str(), "\"result\"");
+    ASSERT_STR_CONTAINS(resp.c_str(), "\"id\":70");
+}
+
+TEST(resources_subscribe_missing_uri) {
+    auto* s = makeTestServer();
+    String req = R"({"jsonrpc":"2.0","id":71,"method":"resources/subscribe","params":{}})";
+    String resp = s->_processJsonRpc(req);
+    ASSERT_STR_CONTAINS(resp.c_str(), "\"error\"");
+    ASSERT_STR_CONTAINS(resp.c_str(), "Missing resource URI");
+}
+
+TEST(resources_unsubscribe) {
+    auto* s = makeTestServer();
+    // Subscribe first
+    String sub = R"({"jsonrpc":"2.0","id":72,"method":"resources/subscribe","params":{"uri":"test://data"}})";
+    s->_processJsonRpc(sub);
+    // Unsubscribe
+    String unsub = R"({"jsonrpc":"2.0","id":73,"method":"resources/unsubscribe","params":{"uri":"test://data"}})";
+    String resp = s->_processJsonRpc(unsub);
+    ASSERT_STR_CONTAINS(resp.c_str(), "\"result\"");
+}
+
+TEST(notify_resource_updated_only_when_subscribed) {
+    auto* s = makeTestServer();
+    // Not subscribed — should not generate notification
+    s->notifyResourceUpdated("test://data");
+    ASSERT_EQ(s->_pendingNotifications.size(), (size_t)0);
+
+    // Subscribe
+    String sub = R"({"jsonrpc":"2.0","id":74,"method":"resources/subscribe","params":{"uri":"test://data"}})";
+    s->_processJsonRpc(sub);
+
+    // Now notify — should generate notification
+    s->notifyResourceUpdated("test://data");
+    ASSERT_EQ(s->_pendingNotifications.size(), (size_t)1);
+    ASSERT_STR_CONTAINS(s->_pendingNotifications[0].c_str(), "notifications/resources/updated");
+    ASSERT_STR_CONTAINS(s->_pendingNotifications[0].c_str(), "test://data");
+}
+
+TEST(initialize_advertises_subscribe_capability) {
+    auto* s = makeTestServer();
+    String req = R"({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}})";
+    String resp = s->_processJsonRpc(req);
+    ASSERT_STR_CONTAINS(resp.c_str(), "\"subscribe\":true");
+}
+
+// ── Completion tests ──────────────────────────────────────────────────
+
+TEST(completion_complete_for_prompt) {
+    auto* s = makeTestServer();
+    // Register a completion provider
+    s->completions().addPromptCompletion("greet", "name",
+        [](const String& argName, const String& partial) -> std::vector<String> {
+            return {"Alice", "Albrecht", "Bob", "Charlie"};
+        });
+
+    String req = R"({"jsonrpc":"2.0","id":80,"method":"completion/complete","params":{
+        "ref":{"type":"ref/prompt","name":"greet"},
+        "argument":{"name":"name","value":"Al"}
+    }})";
+    String resp = s->_processJsonRpc(req);
+
+    ASSERT_STR_CONTAINS(resp.c_str(), "\"result\"");
+    ASSERT_STR_CONTAINS(resp.c_str(), "\"values\"");
+    ASSERT_STR_CONTAINS(resp.c_str(), "Alice");
+    ASSERT_STR_CONTAINS(resp.c_str(), "Albrecht");
+    // "Bob" and "Charlie" should be filtered out (don't start with "Al")
+    ASSERT(strstr(resp.c_str(), "Bob") == nullptr);
+}
+
+TEST(completion_complete_empty_prefix) {
+    auto* s = makeTestServer();
+    s->completions().addPromptCompletion("greet", "name",
+        [](const String& argName, const String& partial) -> std::vector<String> {
+            return {"Alice", "Bob"};
+        });
+
+    String req = R"({"jsonrpc":"2.0","id":81,"method":"completion/complete","params":{
+        "ref":{"type":"ref/prompt","name":"greet"},
+        "argument":{"name":"name","value":""}
+    }})";
+    String resp = s->_processJsonRpc(req);
+
+    ASSERT_STR_CONTAINS(resp.c_str(), "Alice");
+    ASSERT_STR_CONTAINS(resp.c_str(), "Bob");
+}
+
+TEST(completion_complete_missing_ref) {
+    auto* s = makeTestServer();
+    String req = R"({"jsonrpc":"2.0","id":82,"method":"completion/complete","params":{"argument":{"name":"x","value":"y"}}})";
+    String resp = s->_processJsonRpc(req);
+    ASSERT_STR_CONTAINS(resp.c_str(), "\"error\"");
+    ASSERT_STR_CONTAINS(resp.c_str(), "Missing ref");
+}
+
+TEST(completion_complete_missing_argument) {
+    auto* s = makeTestServer();
+    String req = R"({"jsonrpc":"2.0","id":83,"method":"completion/complete","params":{"ref":{"type":"ref/prompt","name":"greet"}}})";
+    String resp = s->_processJsonRpc(req);
+    ASSERT_STR_CONTAINS(resp.c_str(), "\"error\"");
+}
+
+TEST(completion_complete_for_resource_template) {
+    auto* s = makeTestServer();
+    s->completions().addResourceTemplateCompletion(
+        "sensor://{id}/reading", "id",
+        [](const String& argName, const String& partial) -> std::vector<String> {
+            return {"temp1", "temp2", "humidity1"};
+        });
+
+    String req = R"({"jsonrpc":"2.0","id":84,"method":"completion/complete","params":{
+        "ref":{"type":"ref/resource","uri":"sensor://{id}/reading"},
+        "argument":{"name":"id","value":"temp"}
+    }})";
+    String resp = s->_processJsonRpc(req);
+
+    ASSERT_STR_CONTAINS(resp.c_str(), "temp1");
+    ASSERT_STR_CONTAINS(resp.c_str(), "temp2");
+    ASSERT(strstr(resp.c_str(), "humidity1") == nullptr);
+}
+
+TEST(completion_has_more_flag) {
+    auto* s = makeTestServer();
+    ASSERT(!s->completions().hasProviders());
+    s->completions().addPromptCompletion("greet", "name",
+        [](const String& argName, const String& partial) -> std::vector<String> {
+            return {"a"};
+        });
+    ASSERT(s->completions().hasProviders());
+}
+
+TEST(initialize_advertises_completion_capability) {
+    auto* s = makeTestServer();
+    s->completions().addPromptCompletion("greet", "name",
+        [](const String& argName, const String& partial) -> std::vector<String> {
+            return {};
+        });
+
+    String req = R"({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}})";
+    String resp = s->_processJsonRpc(req);
+    ASSERT_STR_CONTAINS(resp.c_str(), "\"completion\"");
+}
+
+// ── Double subscribe idempotency ──────────────────────────────────────
+
+TEST(double_subscribe_is_idempotent) {
+    auto* s = makeTestServer();
+    String sub = R"({"jsonrpc":"2.0","id":90,"method":"resources/subscribe","params":{"uri":"test://data"}})";
+    s->_processJsonRpc(sub);
+    s->_processJsonRpc(sub);
+    // Should only have one subscription entry
+    ASSERT_EQ(s->_subscribedResources.size(), (size_t)1);
 }
 
 // ── Main ───────────────────────────────────────────────────────────────

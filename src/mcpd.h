@@ -24,9 +24,10 @@
 #include "MCPResourceTemplate.h"
 #include "MCPPrompt.h"
 #include "MCPLogging.h"
+#include "MCPCompletion.h"
 #include "MCPTransport.h"
 
-#define MCPD_VERSION "0.3.0"
+#define MCPD_VERSION "0.4.0"
 #define MCPD_MCP_PROTOCOL_VERSION "2025-03-26"
 
 namespace mcpd {
@@ -132,6 +133,17 @@ public:
     /** Access the logging subsystem */
     Logging& logging() { return _logging; }
 
+    /** Access the completion manager for registering autocomplete providers */
+    CompletionManager& completions() { return _completions; }
+
+    // ── Resource Subscriptions ─────────────────────────────────────────
+
+    /**
+     * Notify that a subscribed resource has been updated.
+     * Queues a notifications/resources/updated notification for subscribers.
+     */
+    void notifyResourceUpdated(const char* uri);
+
     /** Set pagination page size for list methods (0 = no pagination) */
     void setPageSize(size_t pageSize) { _pageSize = pageSize; }
 
@@ -176,6 +188,7 @@ private:
 
     WebServer* _httpServer = nullptr;
     Logging _logging;
+    CompletionManager _completions;
 
     std::vector<MCPTool> _tools;
     std::vector<MCPResource> _resources;
@@ -184,6 +197,9 @@ private:
 
     // Pending notifications to send
     std::vector<String> _pendingNotifications;
+
+    // Resource subscriptions: URI → subscribed
+    std::vector<String> _subscribedResources;
 
     // ── JSON-RPC dispatch ──────────────────────────────────────────────
 
@@ -206,6 +222,9 @@ private:
     String _handlePromptsGet(JsonVariant params, JsonVariant id);
     String _handlePing(JsonVariant id);
     String _handleLoggingSetLevel(JsonVariant params, JsonVariant id);
+    String _handleCompletionComplete(JsonVariant params, JsonVariant id);
+    String _handleResourcesSubscribe(JsonVariant params, JsonVariant id);
+    String _handleResourcesUnsubscribe(JsonVariant params, JsonVariant id);
 
     // ── Helpers ────────────────────────────────────────────────────────
 

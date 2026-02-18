@@ -285,6 +285,10 @@ mcpd implements MCP specification 2025-03-26 via Streamable HTTP transport.
 | `resources/templates/list` | List resource templates |
 | `prompts/list` | List available prompts |
 | `prompts/get` | Get a prompt with arguments filled in |
+| `logging/setLevel` | Set minimum log level for notifications |
+| `completion/complete` | Get autocomplete suggestions for prompt args or resource template vars |
+| `resources/subscribe` | Subscribe to change notifications for a resource URI |
+| `resources/unsubscribe` | Unsubscribe from resource change notifications |
 
 ### Session Management
 

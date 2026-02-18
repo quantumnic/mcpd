@@ -33,20 +33,22 @@
 |---|:---:|:---:|:---:|
 | Runs on the MCU | ✅ | ✅ | ❌ CLI tool |
 | MCP spec compliant | ✅ 2025-03-26 | ❌ custom WS | ❌ |
-| Actually compiles | ✅ 35 tests | ❌ self-described | N/A |
+| Actually compiles | ✅ 65 tests | ❌ self-described | N/A |
 | Streamable HTTP + SSE | ✅ | ❌ | ❌ |
 | WebSocket transport | ✅ | ✅ | ❌ |
 | Claude Desktop bridge | ✅ | ❌ | ❌ |
 | mDNS discovery | ✅ | ❌ | ❌ |
 | Resource Templates (RFC 6570) | ✅ | ❌ | ❌ |
-| Built-in tools (GPIO, I2C, MQTT…) | ✅ 9 tools | ❌ | ❌ |
+| Built-in tools (GPIO, I2C, SPI, MQTT…) | ✅ 10 tools | ❌ | ❌ |
 | Prompts support | ✅ | ❌ | ❌ |
 | Authentication | ✅ | ❌ | ❌ |
 | OTA Updates | ✅ | ❌ | ❌ |
 | Prometheus Metrics | ✅ | ❌ | ❌ |
 | Captive Portal + Setup CLI | ✅ | ❌ | ❌ |
 | Hardware Abstraction Layer | ✅ | ❌ | ❌ |
-| Multi-platform (ESP32, RP2040) | ✅ | ESP32 only | ESP32 only |
+| Resource Subscriptions | ✅ | ❌ | ❌ |
+| Completion/Autocomplete | ✅ | ❌ | ❌ |
+| Multi-platform (ESP32, RP2040, STM32) | ✅ | ESP32 only | ESP32 only |
 
 ## Architecture
 
@@ -72,10 +74,10 @@
                    │  │          ┌───────────────┬┼──────┐   ││
                    │  │          ▼               ▼▼      ▼   ││
                    │  │  ┌─────────────┐ ┌──────────┐ ┌───┐ ││
-                   │  │  │Tools (8)    │ │Resources │ │Tpl│ ││
+                   │  │  │Tools (10)   │ │Resources │ │Tpl│ ││
                    │  │  │GPIO PWM I2C │ │Readings  │ │URI│ ││
-                   │  │  │Servo DHT NP │ │Status    │ │   │ ││
-                   │  │  │WiFi System  │ │Custom    │ │   │ ││
+                   │  │  │SPI Servo DHT│ │Status    │ │   │ ││
+                   │  │  │NP WiFi Sys  │ │Custom    │ │   │ ││
                    │  │  └─────────────┘ └──────────┘ └───┘ ││
                    │  └──────────────────────────────────────┘│
                    │  ┌──────────────────────────────────────┐│

@@ -314,6 +314,9 @@ String Server::_dispatch(const char* method, JsonVariant params, JsonVariant id)
     if (m == "prompts/list")           return _handlePromptsList(params, id);
     if (m == "prompts/get")            return _handlePromptsGet(params, id);
     if (m == "logging/setLevel")       return _handleLoggingSetLevel(params, id);
+    if (m == "completion/complete")     return _handleCompletionComplete(params, id);
+    if (m == "resources/subscribe")     return _handleResourcesSubscribe(params, id);
+    if (m == "resources/unsubscribe")   return _handleResourcesUnsubscribe(params, id);
 
     // notifications/initialized — no response needed
     if (m == "notifications/initialized") return "";
@@ -346,10 +349,11 @@ String Server::_handleInitialize(JsonVariant params, JsonVariant id) {
         toolsCap["listChanged"] = true;
     }
 
-    // Advertise resources capability with listChanged support
+    // Advertise resources capability with listChanged and subscribe support
     if (!_resources.empty() || !_resourceTemplates.empty()) {
         JsonObject resCap = capabilities["resources"].to<JsonObject>();
         resCap["listChanged"] = true;
+        resCap["subscribe"] = true;
     }
 
     // Advertise prompts capability with listChanged support
@@ -360,6 +364,11 @@ String Server::_handleInitialize(JsonVariant params, JsonVariant id) {
 
     // Advertise logging capability
     capabilities["logging"].to<JsonObject>();
+
+    // Advertise completion capability if providers are registered
+    if (_completions.hasProviders()) {
+        capabilities["completion"].to<JsonObject>();
+    }
 
     String resultStr;
     serializeJson(result, resultStr);
@@ -616,6 +625,117 @@ String Server::_handleLoggingSetLevel(JsonVariant params, JsonVariant id) {
     Serial.printf("[mcpd] Log level set to: %s\n", level);
 
     return _jsonRpcResult(id, "{}");
+}
+
+String Server::_handleCompletionComplete(JsonVariant params, JsonVariant id) {
+    // Extract ref (what we're completing for)
+    JsonObject ref = params["ref"].as<JsonObject>();
+    if (ref.isNull()) {
+        return _jsonRpcError(id, -32602, "Missing ref parameter");
+    }
+
+    const char* refType = ref["type"];
+    if (!refType) {
+        return _jsonRpcError(id, -32602, "Missing ref.type");
+    }
+
+    const char* argumentName = params["argument"]["name"];
+    const char* argumentValue = params["argument"]["value"];
+    if (!argumentName || !argumentValue) {
+        return _jsonRpcError(id, -32602, "Missing argument.name or argument.value");
+    }
+
+    String partial(argumentValue);
+    bool hasMore = false;
+    std::vector<String> values;
+
+    String type(refType);
+    if (type == "ref/prompt") {
+        const char* promptName = ref["name"];
+        if (!promptName) {
+            return _jsonRpcError(id, -32602, "Missing ref.name for prompt completion");
+        }
+        values = _completions.completePrompt(String(promptName),
+                                              String(argumentName), partial, hasMore);
+    } else if (type == "ref/resource") {
+        const char* uri = ref["uri"];
+        if (!uri) {
+            return _jsonRpcError(id, -32602, "Missing ref.uri for resource template completion");
+        }
+        values = _completions.completeResourceTemplate(String(uri),
+                                                        String(argumentName), partial, hasMore);
+    } else {
+        return _jsonRpcError(id, -32602, "Unknown ref type");
+    }
+
+    JsonDocument result;
+    JsonObject completion = result["completion"].to<JsonObject>();
+    JsonArray valuesArr = completion["values"].to<JsonArray>();
+    for (const auto& v : values) {
+        valuesArr.add(v);
+    }
+    completion["total"] = values.size();
+    completion["hasMore"] = hasMore;
+
+    String resultStr;
+    serializeJson(result, resultStr);
+    return _jsonRpcResult(id, resultStr);
+}
+
+String Server::_handleResourcesSubscribe(JsonVariant params, JsonVariant id) {
+    const char* uri = params["uri"];
+    if (!uri) {
+        return _jsonRpcError(id, -32602, "Missing resource URI");
+    }
+
+    // Add to subscriptions if not already present
+    String uriStr(uri);
+    bool found = false;
+    for (const auto& sub : _subscribedResources) {
+        if (sub == uriStr) { found = true; break; }
+    }
+    if (!found) {
+        _subscribedResources.push_back(uriStr);
+    }
+
+    return _jsonRpcResult(id, "{}");
+}
+
+String Server::_handleResourcesUnsubscribe(JsonVariant params, JsonVariant id) {
+    const char* uri = params["uri"];
+    if (!uri) {
+        return _jsonRpcError(id, -32602, "Missing resource URI");
+    }
+
+    String uriStr(uri);
+    for (auto it = _subscribedResources.begin(); it != _subscribedResources.end(); ++it) {
+        if (*it == uriStr) {
+            _subscribedResources.erase(it);
+            break;
+        }
+    }
+
+    return _jsonRpcResult(id, "{}");
+}
+
+void Server::notifyResourceUpdated(const char* uri) {
+    // Only notify if this resource is subscribed
+    String uriStr(uri);
+    bool subscribed = false;
+    for (const auto& sub : _subscribedResources) {
+        if (sub == uriStr) { subscribed = true; break; }
+    }
+    if (!subscribed) return;
+
+    JsonDocument doc;
+    doc["jsonrpc"] = "2.0";
+    doc["method"] = "notifications/resources/updated";
+    JsonObject params = doc["params"].to<JsonObject>();
+    params["uri"] = uri;
+
+    String output;
+    serializeJson(doc, output);
+    _pendingNotifications.push_back(output);
 }
 
 // ════════════════════════════════════════════════════════════════════════
