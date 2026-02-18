@@ -2,6 +2,46 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.15.0] - 2026-02-18
+
+### Added
+- **LCD Display Tool** (`tools/MCPLCDTool.h`) — I2C LCD control (HD44780 + PCF8574 backpack):
+  - `lcd_print` — print text at row/col position, optional clear-before-print, tracks display buffer
+  - `lcd_clear` — clear display and internal buffer
+  - `lcd_setCursor` — move cursor to specific position with bounds validation
+  - `lcd_backlight` — toggle backlight on/off
+  - `lcd_createChar` — define custom 5x8 characters in 8 CGRAM slots (0-7)
+  - `lcd_status` — read display config, backlight state, and current buffer content
+  - Supports 16x2 and 20x4 displays
+  - `addLCDTools(server, address, cols, rows)` — single-call registration
+- **IR Remote Tool** (`tools/MCPIRTool.h`) — infrared remote control:
+  - `ir_send` — send IR code using standard protocols (NEC, Sony, RC5, Samsung, LG) with configurable bit length and repeat count
+  - `ir_send_raw` — send raw mark/space timing sequences with configurable carrier frequency (30-56kHz), max 256 timings
+  - `ir_status` — transmitter status, pin config, total codes sent, last protocol/code
+  - `addIRTools(server, sendPin, recvPin)` — single-call registration
+- **RTC Tool** (`tools/MCPRTCTool.h`) — DS3231/DS1307 real-time clock:
+  - `rtc_get` — read date/time in ISO or component format, includes day-of-week
+  - `rtc_set` — set date/time with full validation (leap years, month lengths), auto day-of-week calculation via Zeller's congruence
+  - `rtc_alarm` — set/clear/check two independent alarms (DS3231 alarm1 supports seconds)
+  - `rtc_temperature` — read DS3231 built-in temperature sensor (°C and °F)
+  - `rtc_status` — chip type, I2C address, current time, alarm states, temperature
+  - `addRTCTools(server, address, chipType)` — single-call registration
+- **Smart Display Example** (`examples/smart_display/`) — demonstrates:
+  - LCD + RTC + IR + DHT integration on shared I2C bus
+  - AI-driven room control: display messages, read clock, send IR commands, monitor environment
+  - Custom prompt for natural language room control
+- 14 new unit tests:
+  - LCD tools: print, clear, backlight toggle, createChar, status (5)
+  - IR tools: send NEC code, send raw timings, status (3)
+  - RTC tools: get datetime, set datetime, reject invalid date, alarm set/check, temperature (5)
+  - Additional pulse counter config test (1)
+
+### Changed
+- Bumped version to 0.15.0
+- Total tests: 188 → 202 unit tests + 15 HTTP integration tests = 217 total
+- Built-in tools now total 83 (69 + 6 LCD + 3 IR + 5 RTC)
+- README comparison table updated to reflect 83 built-in tools
+
 ## [0.14.0] - 2026-02-18
 
 ### Added

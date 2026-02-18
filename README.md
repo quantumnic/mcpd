@@ -39,7 +39,7 @@
 | Claude Desktop bridge | ✅ | ❌ | ❌ |
 | mDNS discovery | ✅ | ❌ | ❌ |
 | Resource Templates (RFC 6570) | ✅ | ❌ | ❌ |
-| Built-in tools (GPIO, I2C, SPI, ADC, UART, CAN, FS, Power, Timer…) | ✅ 69 tools | ❌ | ❌ |
+| Built-in tools (GPIO, I2C, SPI, ADC, UART, CAN, FS, Power, Timer, LCD, IR, RTC…) | ✅ 83 tools | ❌ | ❌ |
 | Sampling (server requests LLM from client) | ✅ | ❌ | ❌ |
 | Elicitation (server requests user input) | ✅ | ❌ | ❌ |
 | Audio content type | ✅ | ❌ | ❌ |

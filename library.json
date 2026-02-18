@@ -1,6 +1,6 @@
 {
   "name": "mcpd",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "description": "MCP Server SDK for Microcontrollers — Expose ESP32/RP2040/STM32 hardware as AI-accessible tools via Model Context Protocol",
   "keywords": [
     "mcp",

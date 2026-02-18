@@ -712,7 +712,7 @@ TEST(version_is_0_11_0_compat) {
     auto* s = makeTestServer();
     String req = R"({"jsonrpc":"2.0","id":250,"method":"initialize","params":{}})";
     String resp = s->_processJsonRpc(req);
-    ASSERT_STR_CONTAINS(resp.c_str(), "\"version\":\"0.14.0\"");
+    ASSERT_STR_CONTAINS(resp.c_str(), "\"version\":\"0.15.0\"");
 }
 
 // ── v0.6.0 Tests: Tool Annotations ────────────────────────────────────
@@ -1567,7 +1567,7 @@ TEST(version_0_11_0) {
     Server* s = makeTestServer();
     String req = R"({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","clientInfo":{"name":"test"}}})";
     String resp = s->_processJsonRpc(req);
-    ASSERT_STR_CONTAINS(resp.c_str(), "0.14.0");
+    ASSERT_STR_CONTAINS(resp.c_str(), "0.15.0");
 }
 
 // ── Watchdog Tool Tests ────────────────────────────────────────────────
@@ -1811,7 +1811,7 @@ TEST(diagnostics_version_macros) {
     ASSERT(strlen(MCPD_VERSION) > 0);
     ASSERT(strlen(MCPD_MCP_PROTOCOL_VERSION) > 0);
     ASSERT_STR_CONTAINS(MCPD_MCP_PROTOCOL_VERSION, "2025");
-    ASSERT_STR_CONTAINS(MCPD_VERSION, "0.14.0");
+    ASSERT_STR_CONTAINS(MCPD_VERSION, "0.15.0");
 }
 
 // ── Batch JSON-RPC edge cases ──────────────────────────────────────────
@@ -2301,6 +2301,207 @@ TEST(buzzer_tone_rejects_invalid_frequency) {
     String req = R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"buzzer_tone","arguments":{"frequency":5,"duration":100}}})";
     String resp = s->_processJsonRpc(req);
     ASSERT_STR_CONTAINS(resp.c_str(), "Frequency must be");
+}
+
+// ── LCD Tool Tests ─────────────────────────────────────────────────────
+
+TEST(lcd_print_text) {
+    auto* s = makeTestServer();
+    s->addTool("lcd_print", "Print text on LCD",
+        R"({"type":"object","properties":{"text":{"type":"string"},"row":{"type":"integer"},"col":{"type":"integer"}},"required":["text"]})",
+        [](const JsonObject& params) -> String {
+            const char* text = params["text"] | "";
+            int row = params["row"] | 0;
+            int col = params["col"] | 0;
+            return String("{\"printed\":true,\"text\":\"") + text +
+                   "\",\"row\":" + row + ",\"col\":" + col + ",\"chars_written\":" + (int)strlen(text) + "}";
+        });
+    String req = R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"lcd_print","arguments":{"text":"Hello","row":0,"col":0}}})";
+    String resp = s->_processJsonRpc(req);
+    ASSERT_STR_CONTAINS(resp.c_str(), "printed");
+    ASSERT_STR_CONTAINS(resp.c_str(), "Hello");
+}
+
+TEST(lcd_clear_display) {
+    auto* s = makeTestServer();
+    s->addTool("lcd_clear", "Clear LCD",
+        R"({"type":"object","properties":{}})",
+        [](const JsonObject&) -> String { return R"({"cleared":true})"; });
+    String req = R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"lcd_clear","arguments":{}}})";
+    String resp = s->_processJsonRpc(req);
+    ASSERT_STR_CONTAINS(resp.c_str(), "cleared");
+}
+
+TEST(lcd_backlight_control) {
+    auto* s = makeTestServer();
+    s->addTool("lcd_backlight", "Backlight",
+        R"({"type":"object","properties":{"on":{"type":"boolean"}},"required":["on"]})",
+        [](const JsonObject& params) -> String {
+            return R"({"backlight":false,"toggled":true})";
+        });
+    String req = R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"lcd_backlight","arguments":{"on":false}}})";
+    String resp = s->_processJsonRpc(req);
+    ASSERT_STR_CONTAINS(resp.c_str(), "backlight");
+    ASSERT_STR_CONTAINS(resp.c_str(), "toggled");
+}
+
+TEST(lcd_createChar_valid) {
+    auto* s = makeTestServer();
+    s->addTool("lcd_createChar", "Custom char",
+        R"({"type":"object","properties":{"slot":{"type":"integer"},"pattern":{"type":"array"}},"required":["slot","pattern"]})",
+        [](const JsonObject& params) -> String {
+            int slot = params["slot"] | 0;
+            if (slot < 0 || slot > 7) return R"({"error":"Slot must be 0-7"})";
+            return String("{\"created\":true,\"slot\":") + slot + "}";
+        });
+    String req = R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"lcd_createChar","arguments":{"slot":3,"pattern":[0,0,14,17,17,14,0,0]}}})";
+    String resp = s->_processJsonRpc(req);
+    ASSERT_STR_CONTAINS(resp.c_str(), "created");
+    ASSERT_STR_CONTAINS(resp.c_str(), "3");
+}
+
+TEST(lcd_status_returns_config) {
+    auto* s = makeTestServer();
+    s->addTool("lcd_status", "LCD status",
+        R"({"type":"object","properties":{}})",
+        [](const JsonObject&) -> String {
+            return R"({"address":"0x27","size":"16x2","backlight":true,"lines":["Hello",""]})";
+        });
+    String req = R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"lcd_status","arguments":{}}})";
+    String resp = s->_processJsonRpc(req);
+    ASSERT_STR_CONTAINS(resp.c_str(), "16x2");
+    ASSERT_STR_CONTAINS(resp.c_str(), "0x27");
+}
+
+// ── IR Tool Tests ──────────────────────────────────────────────────────
+
+TEST(ir_send_nec_code) {
+    auto* s = makeTestServer();
+    s->addTool("ir_send", "Send IR",
+        R"({"type":"object","properties":{"protocol":{"type":"string"},"code":{"type":"integer"}},"required":["protocol","code"]})",
+        [](const JsonObject& params) -> String {
+            const char* proto = params["protocol"] | "NEC";
+            int code = params["code"] | 0;
+            return String("{\"sent\":true,\"protocol\":\"") + proto +
+                   "\",\"code\":" + code + ",\"bits\":32}";
+        });
+    String req = R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"ir_send","arguments":{"protocol":"NEC","code":16753245}}})";
+    String resp = s->_processJsonRpc(req);
+    ASSERT_STR_CONTAINS(resp.c_str(), "sent");
+    ASSERT_STR_CONTAINS(resp.c_str(), "NEC");
+    ASSERT_STR_CONTAINS(resp.c_str(), "16753245");
+}
+
+TEST(ir_send_raw_timings) {
+    auto* s = makeTestServer();
+    s->addTool("ir_send_raw", "Send raw IR",
+        R"({"type":"object","properties":{"timings":{"type":"array"},"frequency":{"type":"integer"}},"required":["timings"]})",
+        [](const JsonObject& params) -> String {
+            auto timings = params["timings"];
+            int count = timings.size();
+            int freq = params["frequency"] | 38000;
+            return String("{\"sent\":true,\"protocol\":\"RAW\",\"timings_count\":") +
+                   count + ",\"carrier_hz\":" + freq + "}";
+        });
+    String req = R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"ir_send_raw","arguments":{"timings":[9000,4500,560,560,560,1690],"frequency":38000}}})";
+    String resp = s->_processJsonRpc(req);
+    ASSERT_STR_CONTAINS(resp.c_str(), "RAW");
+    ASSERT_STR_CONTAINS(resp.c_str(), "timings_count");
+}
+
+TEST(ir_status_info) {
+    auto* s = makeTestServer();
+    s->addTool("ir_status", "IR status",
+        R"({"type":"object","properties":{}})",
+        [](const JsonObject&) -> String {
+            return R"({"send_pin":14,"recv_pin":15,"total_sent":0})";
+        });
+    String req = R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"ir_status","arguments":{}}})";
+    String resp = s->_processJsonRpc(req);
+    ASSERT_STR_CONTAINS(resp.c_str(), "send_pin");
+    ASSERT_STR_CONTAINS(resp.c_str(), "total_sent");
+}
+
+// ── RTC Tool Tests ─────────────────────────────────────────────────────
+
+TEST(rtc_get_datetime) {
+    auto* s = makeTestServer();
+    s->addTool("rtc_get", "Get RTC time",
+        R"({"type":"object","properties":{"format":{"type":"string"}}})",
+        [](const JsonObject&) -> String {
+            return R"({"datetime":"2026-02-18T12:00:00","day_of_week":"Wed"})";
+        });
+    String req = R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"rtc_get","arguments":{}}})";
+    String resp = s->_processJsonRpc(req);
+    ASSERT_STR_CONTAINS(resp.c_str(), "2026-02-18");
+    ASSERT_STR_CONTAINS(resp.c_str(), "Wed");
+}
+
+TEST(rtc_set_datetime) {
+    auto* s = makeTestServer();
+    s->addTool("rtc_set", "Set RTC time",
+        R"({"type":"object","properties":{"year":{"type":"integer"},"month":{"type":"integer"},"day":{"type":"integer"},"hour":{"type":"integer"},"minute":{"type":"integer"},"second":{"type":"integer"}},"required":["year","month","day","hour","minute","second"]})",
+        [](const JsonObject& params) -> String {
+            int y = params["year"], mo = params["month"], d = params["day"];
+            int h = params["hour"], mi = params["minute"], s = params["second"];
+            if (mo < 1 || mo > 12) return R"({"error":"Invalid date"})";
+            char iso[25];
+            snprintf(iso, sizeof(iso), "%04d-%02d-%02dT%02d:%02d:%02d", y, mo, d, h, mi, s);
+            return String("{\"set\":true,\"datetime\":\"") + iso + "\"}";
+        });
+    String req = R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"rtc_set","arguments":{"year":2026,"month":3,"day":15,"hour":14,"minute":30,"second":0}}})";
+    String resp = s->_processJsonRpc(req);
+    ASSERT_STR_CONTAINS(resp.c_str(), "set");
+    ASSERT_STR_CONTAINS(resp.c_str(), "2026-03-15");
+}
+
+TEST(rtc_set_rejects_invalid_date) {
+    auto* s = makeTestServer();
+    s->addTool("rtc_set", "Set RTC time",
+        R"({"type":"object","properties":{"year":{"type":"integer"},"month":{"type":"integer"},"day":{"type":"integer"},"hour":{"type":"integer"},"minute":{"type":"integer"},"second":{"type":"integer"}},"required":["year","month","day","hour","minute","second"]})",
+        [](const JsonObject& params) -> String {
+            int mo = params["month"];
+            if (mo < 1 || mo > 12) return R"({"error":"Invalid date"})";
+            return R"({"set":true})";
+        });
+    String req = R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"rtc_set","arguments":{"year":2026,"month":13,"day":1,"hour":0,"minute":0,"second":0}}})";
+    String resp = s->_processJsonRpc(req);
+    ASSERT_STR_CONTAINS(resp.c_str(), "Invalid date");
+}
+
+TEST(rtc_alarm_set_and_check) {
+    auto* s = makeTestServer();
+    s->addTool("rtc_alarm", "RTC alarm",
+        R"({"type":"object","properties":{"alarm":{"type":"integer"},"action":{"type":"string"},"hour":{"type":"integer"},"minute":{"type":"integer"}},"required":["alarm","action"]})",
+        [](const JsonObject& params) -> String {
+            int num = params["alarm"] | 1;
+            const char* action = params["action"] | "check";
+            if (strcmp(action, "set") == 0) {
+                int h = params["hour"] | 0;
+                int m = params["minute"] | 0;
+                char buf[16];
+                snprintf(buf, sizeof(buf), "%02d:%02d:00", h, m);
+                return String("{\"alarm\":") + num + ",\"set\":true,\"time\":\"" + buf + "\"}";
+            }
+            return String("{\"alarm\":") + num + ",\"enabled\":false,\"triggered\":false}";
+        });
+    String req = R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"rtc_alarm","arguments":{"alarm":1,"action":"set","hour":7,"minute":30}}})";
+    String resp = s->_processJsonRpc(req);
+    ASSERT_STR_CONTAINS(resp.c_str(), "set");
+    ASSERT_STR_CONTAINS(resp.c_str(), "07:30");
+}
+
+TEST(rtc_temperature_reads) {
+    auto* s = makeTestServer();
+    s->addTool("rtc_temperature", "RTC temperature",
+        R"({"type":"object","properties":{}})",
+        [](const JsonObject&) -> String {
+            return R"({"celsius":22.50,"fahrenheit":72.50,"sensor":"DS3231 built-in"})";
+        });
+    String req = R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"rtc_temperature","arguments":{}}})";
+    String resp = s->_processJsonRpc(req);
+    ASSERT_STR_CONTAINS(resp.c_str(), "22.50");
+    ASSERT_STR_CONTAINS(resp.c_str(), "DS3231");
 }
 
 // ── Main ───────────────────────────────────────────────────────────────
