@@ -34,12 +34,14 @@
 #include "MCPElicitation.h"
 #include "MCPTransportWS.h"
 #include "MCPRateLimit.h"
+#include "MCPSession.h"
+#include "MCPHeap.h"
 
 #ifdef ESP32
 #include "MCPTransportBLE.h"
 #endif
 
-#define MCPD_VERSION "0.10.0"
+#define MCPD_VERSION "0.11.0"
 #define MCPD_MCP_PROTOCOL_VERSION "2025-03-26"
 
 namespace mcpd {
@@ -232,6 +234,22 @@ public:
     /** Access the rate limiter for stats or manual control */
     RateLimiter& rateLimiter() { return _rateLimiter; }
 
+    // ── Session Management ─────────────────────────────────────────────
+
+    /** Access session manager for multi-client session control */
+    SessionManager& sessions() { return _sessionManager; }
+
+    /** Set max concurrent sessions (default: 4, 0 = unlimited) */
+    void setMaxSessions(size_t max) { _sessionManager.setMaxSessions(max); }
+
+    /** Set session idle timeout in ms (default: 30 min, 0 = no timeout) */
+    void setSessionTimeout(unsigned long timeoutMs) { _sessionManager.setIdleTimeout(timeoutMs); }
+
+    // ── Heap Monitoring ────────────────────────────────────────────────
+
+    /** Access heap monitor for memory diagnostics */
+    HeapMonitor& heap() { return _heapMonitor; }
+
     // ── Lifecycle Hooks ────────────────────────────────────────────────
 
     using LifecycleCallback = std::function<void()>;
@@ -313,6 +331,8 @@ private:
 #endif
 
     RateLimiter _rateLimiter;
+    SessionManager _sessionManager;
+    HeapMonitor _heapMonitor;
 
     // Lifecycle callbacks
     InitCallback _onInitializeCb;

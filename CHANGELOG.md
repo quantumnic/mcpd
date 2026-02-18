@@ -2,6 +2,49 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.11.0] - 2026-02-18
+
+### Added
+- **OneWire / DS18B20 Temperature Tool** (`tools/MCPOneWireTool.h`) — popular temperature sensor support:
+  - `onewire_scan` — scan bus for connected devices, identify sensor family (DS18B20/DS18S20/DS1822/DS1825)
+  - `onewire_read_temp` — read temperature from sensor by index or address (°C and °F)
+  - `onewire_read_all` — read all sensors on the bus in one call
+  - `onewire_set_resolution` — configure 9-12 bit resolution per sensor (accuracy vs speed tradeoff)
+  - Proper MCP tool annotations (readOnly, title)
+  - `addOneWireTools(server, pin)` — single-call registration
+- **Session Management** (`MCPSession.h`) — multi-client session tracking:
+  - `SessionManager` — tracks concurrent MCP sessions with configurable limits
+  - `server.setMaxSessions(n)` — limit concurrent AI clients (default: 4)
+  - `server.setSessionTimeout(ms)` — auto-expire idle sessions (default: 30 min)
+  - `Session` struct with client name, creation time, last activity tracking
+  - Automatic eviction of oldest idle session when limit reached
+  - `sessions().summary()` — JSON diagnostic overview of all active sessions
+  - `validateSession()`, `removeSession()`, `pruneExpired()` for lifecycle management
+- **Heap / Memory Monitor** (`MCPHeap.h`) — embedded memory diagnostics:
+  - `HeapMonitor` class — tracks free heap, fragmentation, min-ever, PSRAM
+  - `heap_status` tool — current memory state, usage %, fragmentation %, low-memory warning
+  - `heap_history` tool — memory statistics since boot, uptime
+  - `server.heap().sample()` — periodic sampling for trend tracking
+  - `server.heap().isLow()` — quick low-memory check
+  - Configurable warning threshold (default 10KB)
+- **Temperature Monitor Example** (`examples/temperature_monitor/`) — demonstrates:
+  - Multi-sensor DS18B20 monitoring with OneWire tools
+  - Heap monitoring for device health
+  - Session management with limits and timeouts
+  - Temperature history resource with ring buffer
+  - Diagnostic prompt for AI-driven analysis
+- 13 new unit tests:
+  - Session manager: create, validate, remove, max limit, get info, summary, timeout config (8)
+  - Heap monitor: initial state, warning threshold, usage percent (3)
+  - Server integration: session manager access, heap monitor access (2)
+
+### Changed
+- Bumped version to 0.11.0
+- Total tests: 136 → 149 unit tests + 15 HTTP integration tests = 164 total
+- `Server` class now includes `SessionManager` and `HeapMonitor` members
+- `mcpd.h` now includes `MCPSession.h` and `MCPHeap.h`
+- Built-in tools now total 38 (34 + 4 OneWire + 2 heap monitoring = 40 tools available)
+
 ## [0.10.0] - 2026-02-18
 
 ### Added

@@ -708,11 +708,11 @@ TEST(pagination_resources) {
     ASSERT_STR_CONTAINS(resp.c_str(), "\"nextCursor\"");
 }
 
-TEST(version_is_0_10_0_compat) {
+TEST(version_is_0_11_0_compat) {
     auto* s = makeTestServer();
     String req = R"({"jsonrpc":"2.0","id":250,"method":"initialize","params":{}})";
     String resp = s->_processJsonRpc(req);
-    ASSERT_STR_CONTAINS(resp.c_str(), "\"version\":\"0.10.0\"");
+    ASSERT_STR_CONTAINS(resp.c_str(), "\"version\":\"0.11.0\"");
 }
 
 // ── v0.6.0 Tests: Tool Annotations ────────────────────────────────────
@@ -1563,11 +1563,11 @@ TEST(rate_limit_not_in_server_info_when_disabled) {
 
 // ── Version Tests ──────────────────────────────────────────────────────
 
-TEST(version_0_10_0) {
+TEST(version_0_11_0) {
     Server* s = makeTestServer();
     String req = R"({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","clientInfo":{"name":"test"}}})";
     String resp = s->_processJsonRpc(req);
-    ASSERT_STR_CONTAINS(resp.c_str(), "0.10.0");
+    ASSERT_STR_CONTAINS(resp.c_str(), "0.11.0");
 }
 
 // ── Watchdog Tool Tests ────────────────────────────────────────────────
@@ -1586,6 +1586,112 @@ TEST(watchdog_tool_registration) {
     mcpd::tools::WatchdogTool::registerAll(*s);
     // Should add 4 tools: status, enable, feed, disable
     ASSERT_EQ(s->_tools.size(), before + 4);
+}
+
+// ── Session Manager Tests ──────────────────────────────────────────────
+
+TEST(session_create_basic) {
+    SessionManager sm;
+    sm.setMaxSessions(4);
+    String sid = sm.createSession("test-client");
+    ASSERT(!sid.isEmpty());
+    ASSERT_EQ(sm.activeCount(), (size_t)1);
+}
+
+TEST(session_validate_existing) {
+    SessionManager sm;
+    String sid = sm.createSession("client-a");
+    ASSERT(sm.validateSession(sid));
+}
+
+TEST(session_validate_nonexistent) {
+    SessionManager sm;
+    ASSERT(!sm.validateSession("nonexistent-id"));
+}
+
+TEST(session_remove) {
+    SessionManager sm;
+    String sid = sm.createSession("client-a");
+    ASSERT_EQ(sm.activeCount(), (size_t)1);
+    ASSERT(sm.removeSession(sid));
+    ASSERT_EQ(sm.activeCount(), (size_t)0);
+}
+
+TEST(session_max_limit) {
+    SessionManager sm;
+    sm.setMaxSessions(2);
+    String s1 = sm.createSession("client-a");
+    String s2 = sm.createSession("client-b");
+    ASSERT(!s1.isEmpty());
+    ASSERT(!s2.isEmpty());
+    ASSERT_EQ(sm.activeCount(), (size_t)2);
+    // Remove one, then third should succeed
+    sm.removeSession(s1);
+    String s3 = sm.createSession("client-c");
+    ASSERT(!s3.isEmpty());
+    ASSERT_EQ(sm.activeCount(), (size_t)2);
+}
+
+TEST(session_get_info) {
+    SessionManager sm;
+    String sid = sm.createSession("my-client");
+    const Session* s = sm.getSession(sid);
+    ASSERT(s != nullptr);
+    ASSERT_STR_CONTAINS(s->clientName.c_str(), "my-client");
+    ASSERT(s->initialized);
+}
+
+TEST(session_summary) {
+    SessionManager sm;
+    sm.createSession("client-a");
+    sm.createSession("client-b");
+    String summary = sm.summary();
+    ASSERT_STR_CONTAINS(summary.c_str(), "activeSessions");
+    ASSERT_STR_CONTAINS(summary.c_str(), "client-a");
+}
+
+TEST(session_idle_timeout_config) {
+    SessionManager sm;
+    sm.setIdleTimeout(5000);
+    ASSERT_EQ(sm.idleTimeout(), 5000UL);
+}
+
+// ── Heap Monitor Tests ─────────────────────────────────────────────────
+
+TEST(heap_monitor_initial_state) {
+    HeapMonitor hm;
+    ASSERT_EQ(hm.lastFree(), (size_t)0);
+    ASSERT_EQ(hm.sampleCount(), (size_t)0);
+    ASSERT(!hm.isLow());
+}
+
+TEST(heap_monitor_warning_threshold) {
+    HeapMonitor hm;
+    hm.setWarningThreshold(20000);
+    // On host (non-ESP32), isLow() returns false always
+    ASSERT(!hm.isLow());
+}
+
+TEST(heap_monitor_usage_percent_zero) {
+    HeapMonitor hm;
+    // Before any samples, total=0, should return 0
+    float pct = hm.usagePercent();
+    ASSERT(pct >= 0.0f && pct <= 0.01f);
+}
+
+// ── Server Session/Heap Integration ────────────────────────────────────
+
+TEST(server_session_manager_access) {
+    Server* s = makeTestServer();
+    s->setMaxSessions(8);
+    ASSERT_EQ(s->sessions().maxSessions(), (size_t)8);
+}
+
+TEST(server_heap_monitor_access) {
+    Server* s = makeTestServer();
+    // Just verify we can access it
+    s->heap().setWarningThreshold(5000);
+    ASSERT(!s->heap().isLow());
 }
 
 // ── Main ───────────────────────────────────────────────────────────────
