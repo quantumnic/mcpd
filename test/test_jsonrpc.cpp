@@ -712,7 +712,7 @@ TEST(version_is_0_11_0_compat) {
     auto* s = makeTestServer();
     String req = R"({"jsonrpc":"2.0","id":250,"method":"initialize","params":{}})";
     String resp = s->_processJsonRpc(req);
-    ASSERT_STR_CONTAINS(resp.c_str(), "\"version\":\"0.15.0\"");
+    ASSERT_STR_CONTAINS(resp.c_str(), "\"version\":\"0.17.0\"");
 }
 
 // ── v0.6.0 Tests: Tool Annotations ────────────────────────────────────
@@ -1567,7 +1567,7 @@ TEST(version_0_11_0) {
     Server* s = makeTestServer();
     String req = R"({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","clientInfo":{"name":"test"}}})";
     String resp = s->_processJsonRpc(req);
-    ASSERT_STR_CONTAINS(resp.c_str(), "0.15.0");
+    ASSERT_STR_CONTAINS(resp.c_str(), "0.17.0");
 }
 
 // ── Watchdog Tool Tests ────────────────────────────────────────────────
@@ -1811,7 +1811,7 @@ TEST(diagnostics_version_macros) {
     ASSERT(strlen(MCPD_VERSION) > 0);
     ASSERT(strlen(MCPD_MCP_PROTOCOL_VERSION) > 0);
     ASSERT_STR_CONTAINS(MCPD_MCP_PROTOCOL_VERSION, "2025");
-    ASSERT_STR_CONTAINS(MCPD_VERSION, "0.15.0");
+    ASSERT_STR_CONTAINS(MCPD_VERSION, "0.17.0");
 }
 
 // ── Batch JSON-RPC edge cases ──────────────────────────────────────────
@@ -1911,7 +1911,7 @@ TEST(stepper_move_requires_position_or_relative) {
     s->addTool("stepper_move", "Move stepper",
         R"({"type":"object","properties":{}})",
         [](const JsonObject& params) -> String {
-            if (!params.containsKey("position") && !params.containsKey("relative")) {
+            if (!params["position"].is<JsonVariant>() && !params["relative"].is<JsonVariant>()) {
                 return R"({"error":"Specify 'position' or 'relative'"})";
             }
             return R"({"moving":true})";
@@ -2514,7 +2514,8 @@ TEST(nvs_set_string) {
             const char* key = params["key"] | "";
             if (strlen(key) == 0) return R"({"error":"Key is required"})";
             if (strlen(key) > 15) return R"json({"error":"Key too long (max 15 characters for NVS)"})json";
-            String val = params["value"].as<String>();
+            const char* rawVal = params["value"].as<const char*>();
+            String val = rawVal ? rawVal : "";
             return String("{\"key\":\"") + key + "\",\"value\":\"" + val + "\",\"type\":\"string\",\"persisted\":true}";
         });
     String req = R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"nvs_set","arguments":{"key":"wifi_ssid","value":"MyNetwork"}}})";

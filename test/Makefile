@@ -24,7 +24,7 @@ else
     endif
 endif
 
-TESTS = test_jsonrpc
+TESTS = test_jsonrpc test_tools
 
 .PHONY: all clean test
 
@@ -35,6 +35,9 @@ test: $(TESTS)
 	@for t in $(TESTS); do echo "Running $$t..."; ./$$t; done
 
 test_jsonrpc: test_jsonrpc.cpp arduino_mock.h test_framework.h ../src/mcpd.h ../src/mcpd.cpp
+	$(CXX) $(CXXFLAGS) -o $@ $< $(LDFLAGS)
+
+test_tools: test_tools.cpp arduino_mock.h test_framework.h ../src/mcpd.h ../src/mcpd.cpp
 	$(CXX) $(CXXFLAGS) -o $@ $< $(LDFLAGS)
 
 clean:

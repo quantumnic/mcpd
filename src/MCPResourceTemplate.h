@@ -113,7 +113,6 @@ struct MCPResourceTemplate {
             tPos = varEnd + 1;
 
             // Find the next literal segment after this variable
-            int nextVarOrEnd;
             String nextLiteral;
             int nextBrace = uriTemplate.indexOf('{', tPos);
             if (tPos < (int)uriTemplate.length() && nextBrace != tPos) {

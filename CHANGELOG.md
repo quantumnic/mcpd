@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.17.0] - 2026-02-18
+
+### Added
+- **Interrupt Monitor Tool** (`tools/MCPInterruptTool.h`) — GPIO edge-event detection:
+  - `interrupt_attach` — configure a pin for interrupt monitoring (rising/falling/change edges, optional pull-up)
+  - `interrupt_read` — read event count, rate (Hz), and last trigger time with optional counter reset
+  - `interrupt_detach` — stop monitoring a pin and get final count
+  - `interrupt_list` — list all pins with active interrupt monitoring
+  - ISR-safe counting with `IRAM_ATTR`, supports up to 8 simultaneous pins
+  - `addInterruptTools(server)` — single-call registration
+- **Analog Watchdog Tool** (`tools/MCPAnalogWatchTool.h`) — threshold monitoring:
+  - `analog_watch_set` — configure low/high thresholds on ADC pins with optional labels
+  - `analog_watch_status` — check all watches with current readings, trigger state, alert count
+  - `analog_watch_clear` — remove a watch from a pin
+  - `updateAnalogWatches()` — call in loop() for 100ms polling (non-blocking)
+  - Supports up to 8 simultaneous watches
+  - `addAnalogWatchTools(server)` — single-call registration
+- **New test suite** `test/test_tools.cpp` — 16 dedicated tests for tool registration, resources, prompts, rich tools, error handling, and batch operations
+
+### Fixed
+- Fixed deprecated `containsKey()` usage in tests — migrated to `obj[key].is<T>()`
+- Fixed `as<String>()` compilation error with ArduinoJson v7 — use `as<const char*>()` instead
+- Fixed unused variable warning in `MCPResourceTemplate.h`
+- Fixed version string assertions in tests (were checking 0.15.0 instead of current version)
+
+### Changed
+- Total test count: **238** (222 JSON-RPC + 16 tool tests)
+- Total built-in tools: **103** (was 99)
+
 ## [0.16.0] - 2026-02-18
 
 ### Added
