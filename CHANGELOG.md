@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.24.0] - 2026-02-19
+
+### Added
+- **EEPROM Tool** (`tools/MCPEEPROMTool.h`) — portable byte-level non-volatile storage for AVR, RP2040, STM32, and ESP boards:
+  - `eeprom_read` — read bytes from EEPROM at a given address (hex + byte array output)
+  - `eeprom_write` — write byte array to EEPROM at a given address
+  - `eeprom_read_int` — read a 32-bit integer (little-endian)
+  - `eeprom_write_int` — write a 32-bit integer (little-endian)
+  - `eeprom_read_string` — read a null-terminated string
+  - `eeprom_write_string` — write a null-terminated string
+  - `eeprom_clear` — fill EEPROM range with 0x00
+  - `eeprom_info` — size, used bytes, and usage percentage
+
+### Tests
+- Added 10 EEPROM tool tests (register, write/read bytes, out-of-range, int read/write, negative int, string read/write, clear, info, exceeds-size, int out-of-range)
+- Added EEPROM mock for native test environment
+- Total native tests: 403 (was 393)
+
 ## [0.23.0] - 2026-02-18
 
 ### Fixed

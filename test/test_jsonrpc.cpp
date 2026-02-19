@@ -712,7 +712,7 @@ TEST(version_is_0_11_0_compat) {
     auto* s = makeTestServer();
     String req = R"({"jsonrpc":"2.0","id":250,"method":"initialize","params":{}})";
     String resp = s->_processJsonRpc(req);
-    ASSERT_STR_CONTAINS(resp.c_str(), "\"version\":\"0.23.0\"");
+    ASSERT_STR_CONTAINS(resp.c_str(), "\"version\":\"0.24.0\"");
 }
 
 // ── v0.6.0 Tests: Tool Annotations ────────────────────────────────────
@@ -1567,7 +1567,7 @@ TEST(version_0_11_0) {
     Server* s = makeTestServer();
     String req = R"({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","clientInfo":{"name":"test"}}})";
     String resp = s->_processJsonRpc(req);
-    ASSERT_STR_CONTAINS(resp.c_str(), "0.23.0");
+    ASSERT_STR_CONTAINS(resp.c_str(), "0.24.0");
 }
 
 // ── Watchdog Tool Tests ────────────────────────────────────────────────
@@ -1811,7 +1811,7 @@ TEST(diagnostics_version_macros) {
     ASSERT(strlen(MCPD_VERSION) > 0);
     ASSERT(strlen(MCPD_MCP_PROTOCOL_VERSION) > 0);
     ASSERT_STR_CONTAINS(MCPD_MCP_PROTOCOL_VERSION, "2025");
-    ASSERT_STR_CONTAINS(MCPD_VERSION, "0.23.0");
+    ASSERT_STR_CONTAINS(MCPD_VERSION, "0.24.0");
 }
 
 // ── Batch JSON-RPC edge cases ──────────────────────────────────────────

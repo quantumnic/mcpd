@@ -1583,6 +1583,112 @@ TEST(analog_watch_tools_register) {
     ASSERT_STR_CONTAINS(resp.c_str(), "analog_watch_clear");
 }
 
+// ── EEPROM Tool Tests ──────────────────────────────────────────────────
+
+#include "../../src/tools/MCPEEPROMTool.h"
+
+TEST(eeprom_tools_register) {
+    auto* s = makeServer();
+    mcpd::addEEPROMTools(*s);
+    String resp = s->_processJsonRpc(R"({"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "eeprom_read");
+    ASSERT_STR_CONTAINS(resp.c_str(), "eeprom_write");
+    ASSERT_STR_CONTAINS(resp.c_str(), "eeprom_read_int");
+    ASSERT_STR_CONTAINS(resp.c_str(), "eeprom_write_int");
+    ASSERT_STR_CONTAINS(resp.c_str(), "eeprom_read_string");
+    ASSERT_STR_CONTAINS(resp.c_str(), "eeprom_write_string");
+    ASSERT_STR_CONTAINS(resp.c_str(), "eeprom_clear");
+    ASSERT_STR_CONTAINS(resp.c_str(), "eeprom_info");
+}
+
+TEST(eeprom_write_and_read) {
+    auto* s = makeServer();
+    mcpd::addEEPROMTools(*s);
+    String resp = call(s, "eeprom_write", R"({"address":0,"bytes":[72,101,108,108,111]})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "written");
+    ASSERT_STR_CONTAINS(resp.c_str(), ":5");
+
+    resp = call(s, "eeprom_read", R"({"address":0,"length":5})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "72,101,108,108,111");
+}
+
+TEST(eeprom_read_out_of_range) {
+    auto* s = makeServer();
+    mcpd::addEEPROMTools(*s);
+    String resp = call(s, "eeprom_read", R"({"address":5000,"length":1})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "error");
+    ASSERT_STR_CONTAINS(resp.c_str(), "out of range");
+}
+
+TEST(eeprom_write_int_and_read_int) {
+    auto* s = makeServer();
+    mcpd::addEEPROMTools(*s);
+    String resp = call(s, "eeprom_write_int", R"({"address":100,"value":42})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "value");
+    ASSERT_STR_CONTAINS(resp.c_str(), ":42");
+
+    resp = call(s, "eeprom_read_int", R"({"address":100})");
+    ASSERT_STR_CONTAINS(resp.c_str(), ":42");
+}
+
+TEST(eeprom_write_int_negative) {
+    auto* s = makeServer();
+    mcpd::addEEPROMTools(*s);
+    String resp = call(s, "eeprom_write_int", R"({"address":200,"value":-12345})");
+    ASSERT_STR_CONTAINS(resp.c_str(), ":-12345");
+
+    resp = call(s, "eeprom_read_int", R"({"address":200})");
+    ASSERT_STR_CONTAINS(resp.c_str(), ":-12345");
+}
+
+TEST(eeprom_write_string_and_read_string) {
+    auto* s = makeServer();
+    mcpd::addEEPROMTools(*s);
+    String resp = call(s, "eeprom_write_string", R"({"address":300,"value":"Hello EEPROM"})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "written");
+    ASSERT_STR_CONTAINS(resp.c_str(), ":13");
+
+    resp = call(s, "eeprom_read_string", R"({"address":300})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "Hello EEPROM");
+    ASSERT_STR_CONTAINS(resp.c_str(), "length");
+}
+
+TEST(eeprom_clear) {
+    auto* s = makeServer();
+    mcpd::addEEPROMTools(*s);
+    call(s, "eeprom_write", R"({"address":0,"bytes":[1,2,3,4,5]})");
+    String resp = call(s, "eeprom_clear", R"({"address":0,"length":5})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "cleared");
+    ASSERT_STR_CONTAINS(resp.c_str(), ":5");
+    resp = call(s, "eeprom_read", R"({"address":0,"length":5})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "0,0,0,0,0");
+}
+
+TEST(eeprom_info) {
+    auto* s = makeServer();
+    mcpd::addEEPROMTools(*s);
+    call(s, "eeprom_write", R"({"address":0,"bytes":[1,2,3]})");
+    String resp = call(s, "eeprom_info", "{}");
+    ASSERT_STR_CONTAINS(resp.c_str(), "size");
+    ASSERT_STR_CONTAINS(resp.c_str(), "4096");
+    ASSERT_STR_CONTAINS(resp.c_str(), "used");
+}
+
+TEST(eeprom_write_exceeds_size) {
+    auto* s = makeServer();
+    mcpd::addEEPROMTools(*s);
+    String resp = call(s, "eeprom_write", R"({"address":4090,"bytes":[1,2,3,4,5,6,7,8]})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "error");
+    ASSERT_STR_CONTAINS(resp.c_str(), "exceed");
+}
+
+TEST(eeprom_read_int_out_of_range) {
+    auto* s = makeServer();
+    mcpd::addEEPROMTools(*s);
+    String resp = call(s, "eeprom_read_int", R"({"address":4094})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "error");
+}
+
 // ── Main ───────────────────────────────────────────────────────────────
 
 int main() {
