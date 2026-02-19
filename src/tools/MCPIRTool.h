@@ -41,7 +41,7 @@ public:
 
         // --- ir_send ---
         server.addTool("ir_send", "Send an IR code using a standard protocol (NEC, Sony, RC5, Samsung, LG)",
-            R"({"type":"object","properties":{"protocol":{"type":"string","enum":["NEC","Sony","RC5","Samsung","LG"],"description":"IR protocol"},"code":{"type":"integer","description":"IR code value (decimal or hex as integer)"},"bits":{"type":"integer","description":"Bit length (default: protocol-specific)","minimum":8,"maximum":64},"repeat":{"type":"integer","description":"Number of times to send (default 1)","minimum":1,"maximum":10}},"required":["protocol","code"]})",
+            R"=({"type":"object","properties":{"protocol":{"type":"string","enum":["NEC","Sony","RC5","Samsung","LG"],"description":"IR protocol"},"code":{"type":"integer","description":"IR code value (decimal or hex as integer)"},"bits":{"type":"integer","description":"Bit length (default: protocol-specific)","minimum":8,"maximum":64},"repeat":{"type":"integer","description":"Number of times to send (default 1)","minimum":1,"maximum":10}},"required":["protocol","code"]})=",
             [](const JsonObject& params) -> String {
                 const char* protocol = params["protocol"] | "NEC";
                 uint32_t code = params["code"] | 0;
@@ -93,7 +93,7 @@ public:
 
         // --- ir_send_raw ---
         server.addTool("ir_send_raw", "Send raw IR timing sequence (mark/space pairs in microseconds)",
-            R"({"type":"object","properties":{"timings":{"type":"array","items":{"type":"integer","minimum":1},"description":"Alternating mark/space durations in microseconds","minItems":2,"maxItems":256},"frequency":{"type":"integer","description":"Carrier frequency in Hz (default 38000)","minimum":30000,"maximum":56000}},"required":["timings"]})",
+            R"=({"type":"object","properties":{"timings":{"type":"array","items":{"type":"integer","minimum":1},"description":"Alternating mark/space durations in microseconds","minItems":2,"maxItems":256},"frequency":{"type":"integer","description":"Carrier frequency in Hz (default 38000)","minimum":30000,"maximum":56000}},"required":["timings"]})=",
             [](const JsonObject& params) -> String {
                 auto timings = params["timings"];
                 int freq = params["frequency"] | 38000;

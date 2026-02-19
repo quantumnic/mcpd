@@ -55,7 +55,7 @@ public:
         // mqtt_connect — Connect to an MQTT broker
         server.addTool("mqtt_connect",
             "Connect to an MQTT broker. Supports optional authentication.",
-            R"({
+            R"=({
                 "type": "object",
                 "properties": {
                     "host": {
@@ -81,7 +81,7 @@ public:
                     }
                 },
                 "required": ["host"]
-            })",
+            })=",
             [this](const JsonObject& args) -> String {
                 return _connect(args);
             });
@@ -89,7 +89,7 @@ public:
         // mqtt_publish — Publish a message to an MQTT topic
         server.addTool("mqtt_publish",
             "Publish a message to an MQTT topic. Must be connected first.",
-            R"({
+            R"=({
                 "type": "object",
                 "properties": {
                     "topic": {
@@ -112,7 +112,7 @@ public:
                     }
                 },
                 "required": ["topic", "payload"]
-            })",
+            })=",
             [this](const JsonObject& args) -> String {
                 return _publish(args);
             });
@@ -120,7 +120,7 @@ public:
         // mqtt_subscribe — Subscribe to an MQTT topic
         server.addTool("mqtt_subscribe",
             "Subscribe to an MQTT topic. Messages are buffered and can be read with mqtt_messages.",
-            R"({
+            R"=({
                 "type": "object",
                 "properties": {
                     "topic": {
@@ -134,7 +134,7 @@ public:
                     }
                 },
                 "required": ["topic"]
-            })",
+            })=",
             [this](const JsonObject& args) -> String {
                 return _subscribe(args);
             });
@@ -142,7 +142,7 @@ public:
         // mqtt_messages — Read buffered messages from subscribed topics
         server.addTool("mqtt_messages",
             "Read recently received MQTT messages. Optionally filter by topic.",
-            R"({
+            R"=({
                 "type": "object",
                 "properties": {
                     "topic": {
@@ -160,7 +160,7 @@ public:
                         "default": false
                     }
                 }
-            })",
+            })=",
             [this](const JsonObject& args) -> String {
                 return _messages(args);
             });

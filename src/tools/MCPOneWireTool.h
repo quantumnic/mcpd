@@ -100,7 +100,7 @@ inline void addOneWireTools(class Server& server, uint8_t pin) {
         MCPTool tool;
         tool.name = "onewire_read_temp";
         tool.description = "Read temperature from a DS18B20 sensor by index or address. Returns temperature in °C and °F.";
-        tool.inputSchemaJson = R"({
+        tool.inputSchemaJson = R"=({
             "type": "object",
             "properties": {
                 "index": {
@@ -113,7 +113,7 @@ inline void addOneWireTools(class Server& server, uint8_t pin) {
                     "description": "Sensor address as hex (e.g. '28:FF:A0:...'). Overrides index if both given."
                 }
             }
-        })";
+        })=";
         tool.annotations.readOnlyHint = true;
         tool.annotations.title = "Read Temperature";
 
@@ -204,7 +204,7 @@ inline void addOneWireTools(class Server& server, uint8_t pin) {
         MCPTool tool;
         tool.name = "onewire_set_resolution";
         tool.description = "Set the measurement resolution of a DS18B20 sensor. Higher resolution = more accurate but slower. 9-bit: 0.5°C (94ms), 10-bit: 0.25°C (188ms), 11-bit: 0.125°C (375ms), 12-bit: 0.0625°C (750ms).";
-        tool.inputSchemaJson = R"({
+        tool.inputSchemaJson = R"=({
             "type": "object",
             "properties": {
                 "index": {
@@ -220,7 +220,7 @@ inline void addOneWireTools(class Server& server, uint8_t pin) {
                 }
             },
             "required": ["resolution"]
-        })";
+        })=";
         tool.annotations.title = "Set Sensor Resolution";
 
         tool.handler = [](const JsonObject& params) -> String {

@@ -149,7 +149,7 @@ inline int addStepperTools(Server& server, int stepPin, int dirPin,
         MCPTool moveTool;
         moveTool.name = "stepper_move";
         moveTool.description = "Move stepper motor to an absolute position or by relative steps. Non-blocking — returns immediately, motor moves in background.";
-        moveTool.inputSchemaJson = R"({
+        moveTool.inputSchemaJson = R"=({
             "type": "object",
             "properties": {
                 "index": {
@@ -168,7 +168,7 @@ inline int addStepperTools(Server& server, int stepPin, int dirPin,
                     "description": "Relative steps to move (positive=forward, negative=backward)"
                 }
             }
-        })";
+        })=";
         moveTool.annotations.title = "Move Stepper";
         moveTool.annotations.readOnlyHint = false;
 
@@ -211,7 +211,7 @@ inline int addStepperTools(Server& server, int stepPin, int dirPin,
         MCPTool statusTool;
         statusTool.name = "stepper_status";
         statusTool.description = "Read stepper motor position, speed, and running state.";
-        statusTool.inputSchemaJson = R"({
+        statusTool.inputSchemaJson = R"=({
             "type": "object",
             "properties": {
                 "index": {
@@ -220,7 +220,7 @@ inline int addStepperTools(Server& server, int stepPin, int dirPin,
                     "default": 0
                 }
             }
-        })";
+        })=";
         statusTool.annotations.title = "Stepper Status";
         statusTool.annotations.readOnlyHint = true;
 
@@ -262,7 +262,7 @@ inline int addStepperTools(Server& server, int stepPin, int dirPin,
         MCPTool configTool;
         configTool.name = "stepper_config";
         configTool.description = "Configure stepper motor parameters: max speed, acceleration, microstepping, direction inversion, enable/disable.";
-        configTool.inputSchemaJson = R"({
+        configTool.inputSchemaJson = R"=({
             "type": "object",
             "properties": {
                 "index": {
@@ -296,7 +296,7 @@ inline int addStepperTools(Server& server, int stepPin, int dirPin,
                     "description": "Enable/disable motor driver"
                 }
             }
-        })";
+        })=";
         configTool.annotations.title = "Configure Stepper";
         configTool.annotations.readOnlyHint = false;
 
@@ -351,7 +351,7 @@ inline int addStepperTools(Server& server, int stepPin, int dirPin,
         MCPTool homeTool;
         homeTool.name = "stepper_home";
         homeTool.description = "Run homing sequence: move toward endstop at reduced speed until triggered, then set position to zero.";
-        homeTool.inputSchemaJson = R"({
+        homeTool.inputSchemaJson = R"=({
             "type": "object",
             "properties": {
                 "index": {
@@ -365,7 +365,7 @@ inline int addStepperTools(Server& server, int stepPin, int dirPin,
                     "minimum": 1
                 }
             }
-        })";
+        })=";
         homeTool.annotations.title = "Home Stepper";
         homeTool.annotations.readOnlyHint = false;
 
@@ -414,7 +414,7 @@ inline int addStepperTools(Server& server, int stepPin, int dirPin,
         MCPTool stopTool;
         stopTool.name = "stepper_stop";
         stopTool.description = "Stop stepper motor immediately (emergency stop) or with deceleration.";
-        stopTool.inputSchemaJson = R"({
+        stopTool.inputSchemaJson = R"=({
             "type": "object",
             "properties": {
                 "index": {
@@ -428,7 +428,7 @@ inline int addStepperTools(Server& server, int stepPin, int dirPin,
                     "default": false
                 }
             }
-        })";
+        })=";
         stopTool.annotations.title = "Stop Stepper";
         stopTool.annotations.readOnlyHint = false;
 

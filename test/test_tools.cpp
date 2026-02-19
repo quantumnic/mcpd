@@ -1948,6 +1948,123 @@ TEST(ota_mark_valid) {
     ASSERT(mcpd::_otaState.firmwareValid == true);
 }
 
+// ── Watchdog Tool Tests ────────────────────────────────────────────────
+
+#include "../src/tools/MCPWatchdogTool.h"
+
+TEST(watchdog_status_disabled_by_default) {
+    auto* s = makeServer();
+    mcpd::tools::WatchdogTool::_enabled = false;
+    mcpd::tools::WatchdogTool::_timeoutSec = 0;
+    mcpd::tools::WatchdogTool::_lastFeedMs = 0;
+    mcpd::tools::WatchdogTool::registerAll(*s);
+    String resp = call(s, "watchdog_status", "{}");
+    ASSERT_STR_CONTAINS(resp.c_str(), "\\\"enabled\\\":false");
+    ASSERT_STR_CONTAINS(resp.c_str(), "uptime_seconds");
+}
+
+TEST(watchdog_enable_sets_timeout) {
+    auto* s = makeServer();
+    mcpd::tools::WatchdogTool::_enabled = false;
+    mcpd::tools::WatchdogTool::_timeoutSec = 0;
+    mcpd::tools::WatchdogTool::registerAll(*s);
+    String resp = call(s, "watchdog_enable", R"({"timeout_seconds":15})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "\\\"status\\\":\\\"enabled\\\"");
+    ASSERT_STR_CONTAINS(resp.c_str(), "\\\"timeout_seconds\\\":15");
+    ASSERT(mcpd::tools::WatchdogTool::_enabled == true);
+    ASSERT(mcpd::tools::WatchdogTool::_timeoutSec == 15);
+}
+
+TEST(watchdog_enable_clamps_timeout) {
+    auto* s = makeServer();
+    mcpd::tools::WatchdogTool::_enabled = false;
+    mcpd::tools::WatchdogTool::registerAll(*s);
+    String resp = call(s, "watchdog_enable", R"({"timeout_seconds":999})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "\\\"timeout_seconds\\\":120");
+}
+
+TEST(watchdog_feed_when_disabled_returns_error) {
+    auto* s = makeServer();
+    mcpd::tools::WatchdogTool::_enabled = false;
+    mcpd::tools::WatchdogTool::registerAll(*s);
+    String resp = call(s, "watchdog_feed", "{}");
+    ASSERT_STR_CONTAINS(resp.c_str(), "error");
+    ASSERT_STR_CONTAINS(resp.c_str(), "not enabled");
+}
+
+TEST(watchdog_feed_when_enabled_succeeds) {
+    auto* s = makeServer();
+    mcpd::tools::WatchdogTool::_enabled = true;
+    mcpd::tools::WatchdogTool::_timeoutSec = 30;
+    mcpd::tools::WatchdogTool::registerAll(*s);
+    String resp = call(s, "watchdog_feed", "{}");
+    ASSERT_STR_CONTAINS(resp.c_str(), "\\\"status\\\":\\\"fed\\\"");
+    ASSERT_STR_CONTAINS(resp.c_str(), "timestamp_ms");
+}
+
+TEST(watchdog_disable_clears_state) {
+    auto* s = makeServer();
+    mcpd::tools::WatchdogTool::_enabled = true;
+    mcpd::tools::WatchdogTool::_timeoutSec = 30;
+    mcpd::tools::WatchdogTool::registerAll(*s);
+    String resp = call(s, "watchdog_disable", "{}");
+    ASSERT_STR_CONTAINS(resp.c_str(), "\\\"status\\\":\\\"disabled\\\"");
+    ASSERT(mcpd::tools::WatchdogTool::_enabled == false);
+    ASSERT(mcpd::tools::WatchdogTool::_timeoutSec == 0);
+}
+
+// ── DAC Tool Tests ────────────────────────────────────────────────────
+
+#include "../src/tools/MCPDACTool.h"
+
+TEST(dac_write_valid_pin) {
+    auto* s = makeServer();
+    mcpd::addDACTools(*s);
+    String resp = call(s, "dac_write", R"({"pin":25,"value":128})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "\\\"pin\\\":25");
+    ASSERT_STR_CONTAINS(resp.c_str(), "\\\"channel\\\":1");
+    ASSERT_STR_CONTAINS(resp.c_str(), "\\\"value\\\":128");
+    ASSERT_STR_CONTAINS(resp.c_str(), "voltage");
+}
+
+TEST(dac_write_invalid_pin) {
+    auto* s = makeServer();
+    mcpd::addDACTools(*s);
+    String resp = call(s, "dac_write", R"({"pin":13,"value":128})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "error");
+    ASSERT_STR_CONTAINS(resp.c_str(), "Invalid DAC pin");
+}
+
+TEST(dac_write_voltage_converts_correctly) {
+    auto* s = makeServer();
+    mcpd::addDACTools(*s);
+    String resp = call(s, "dac_write_voltage", R"({"pin":26,"voltage":1.65})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "\\\"pin\\\":26");
+    ASSERT_STR_CONTAINS(resp.c_str(), "\\\"channel\\\":2");
+    ASSERT_STR_CONTAINS(resp.c_str(), "requested_voltage");
+    ASSERT_STR_CONTAINS(resp.c_str(), "actual_voltage");
+    ASSERT_STR_CONTAINS(resp.c_str(), "resolution_step_mv");
+}
+
+TEST(dac_write_voltage_invalid_range) {
+    auto* s = makeServer();
+    mcpd::addDACTools(*s);
+    String resp = call(s, "dac_write_voltage", R"({"pin":25,"voltage":5.0})");
+    ASSERT_STR_CONTAINS(resp.c_str(), "error");
+    ASSERT_STR_CONTAINS(resp.c_str(), "0-3.3V");
+}
+
+TEST(dac_status_shows_both_channels) {
+    auto* s = makeServer();
+    mcpd::addDACTools(*s);
+    String resp = call(s, "dac_status", "{}");
+    ASSERT_STR_CONTAINS(resp.c_str(), "channels");
+    ASSERT_STR_CONTAINS(resp.c_str(), "\\\"channel\\\":1");
+    ASSERT_STR_CONTAINS(resp.c_str(), "\\\"channel\\\":2");
+    ASSERT_STR_CONTAINS(resp.c_str(), "\\\"pin\\\":25");
+    ASSERT_STR_CONTAINS(resp.c_str(), "\\\"pin\\\":26");
+}
+
 // ── Main ───────────────────────────────────────────────────────────────
 
 int main() {

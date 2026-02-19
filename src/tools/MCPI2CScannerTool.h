@@ -60,7 +60,7 @@ inline void registerI2CScannerTools(Server& server) {
             "i2c_scan",
             "Scan the I2C bus for all connected devices. Returns addresses (hex) "
             "and identifies common sensors/ICs. Useful for debugging hardware setup.",
-            R"({
+            R"=({
                 "type":"object",
                 "properties":{
                     "bus":{"type":"integer","enum":[0,1],"description":"I2C bus number (0 or 1, default 0)"},
@@ -68,7 +68,7 @@ inline void registerI2CScannerTools(Server& server) {
                     "scl":{"type":"integer","description":"SCL pin (default: board default)"},
                     "speed":{"type":"integer","description":"Bus speed in Hz (default 100000)","minimum":10000,"maximum":1000000}
                 }
-            })",
+            })=",
             [](const JsonObject& args) -> String {
                 int bus = args.containsKey("bus") ? args["bus"].as<int>() : 0;
                 TwoWire& wire = (bus == 1) ? Wire1 : Wire;
@@ -129,14 +129,14 @@ inline void registerI2CScannerTools(Server& server) {
         MCPTool tool(
             "i2c_probe",
             "Probe a specific I2C address to check if a device responds.",
-            R"({
+            R"=({
                 "type":"object",
                 "properties":{
                     "address":{"type":"integer","description":"I2C address (7-bit, 1-126)","minimum":1,"maximum":126},
                     "bus":{"type":"integer","enum":[0,1],"description":"I2C bus number (default 0)"}
                 },
                 "required":["address"]
-            })",
+            })=",
             [](const JsonObject& args) -> String {
                 uint8_t addr = args["address"].as<uint8_t>();
                 int bus = args.containsKey("bus") ? args["bus"].as<int>() : 0;

@@ -41,7 +41,7 @@ inline void addCANTools(Server& server, int txPin = 5, int rxPin = 4) {
     MCPTool initTool;
     initTool.name = "can_init";
     initTool.description = "Initialize CAN bus with specified bitrate. Must be called before send/receive.";
-    initTool.inputSchemaJson = R"({
+    initTool.inputSchemaJson = R"=({
         "type": "object",
         "properties": {
             "bitrate": {
@@ -57,7 +57,7 @@ inline void addCANTools(Server& server, int txPin = 5, int rxPin = 4) {
                 "default": "normal"
             }
         }
-    })";
+    })=";
     initTool.annotations.title = "Initialize CAN Bus";
     initTool.annotations.readOnlyHint = false;
     initTool.annotations.destructiveHint = false;
@@ -122,7 +122,7 @@ inline void addCANTools(Server& server, int txPin = 5, int rxPin = 4) {
     MCPTool sendTool;
     sendTool.name = "can_send";
     sendTool.description = "Send a CAN frame. Data is an array of up to 8 bytes.";
-    sendTool.inputSchemaJson = R"({
+    sendTool.inputSchemaJson = R"=({
         "type": "object",
         "properties": {
             "id": {
@@ -147,7 +147,7 @@ inline void addCANTools(Server& server, int txPin = 5, int rxPin = 4) {
             }
         },
         "required": ["id", "data"]
-    })";
+    })=";
     sendTool.annotations.title = "Send CAN Frame";
     sendTool.annotations.readOnlyHint = false;
 
@@ -193,7 +193,7 @@ inline void addCANTools(Server& server, int txPin = 5, int rxPin = 4) {
     MCPTool recvTool;
     recvTool.name = "can_receive";
     recvTool.description = "Read pending CAN frames from the receive buffer. Returns up to max_frames.";
-    recvTool.inputSchemaJson = R"({
+    recvTool.inputSchemaJson = R"=({
         "type": "object",
         "properties": {
             "max_frames": {
@@ -209,7 +209,7 @@ inline void addCANTools(Server& server, int txPin = 5, int rxPin = 4) {
                 "default": 100
             }
         }
-    })";
+    })=";
     recvTool.annotations.title = "Receive CAN Frames";
     recvTool.annotations.readOnlyHint = true;
 
@@ -256,7 +256,7 @@ inline void addCANTools(Server& server, int txPin = 5, int rxPin = 4) {
     MCPTool filterTool;
     filterTool.name = "can_filter";
     filterTool.description = "Set CAN acceptance filter. Only frames matching the filter will be received. Requires re-init.";
-    filterTool.inputSchemaJson = R"({
+    filterTool.inputSchemaJson = R"=({
         "type": "object",
         "properties": {
             "acceptance_code": {
@@ -274,7 +274,7 @@ inline void addCANTools(Server& server, int txPin = 5, int rxPin = 4) {
             }
         },
         "required": ["acceptance_code", "acceptance_mask"]
-    })";
+    })=";
     filterTool.annotations.title = "Set CAN Filter";
     filterTool.annotations.readOnlyHint = false;
 

@@ -40,7 +40,7 @@ public:
 
         // --- lcd_print ---
         server.addTool("lcd_print", "Print text on the LCD at optional row/col position",
-            R"({"type":"object","properties":{"text":{"type":"string","description":"Text to display"},"row":{"type":"integer","description":"Row (0-based, default 0)","minimum":0},"col":{"type":"integer","description":"Column (0-based, default 0)","minimum":0},"clear":{"type":"boolean","description":"Clear display before printing (default false)"}},"required":["text"]})",
+            R"=({"type":"object","properties":{"text":{"type":"string","description":"Text to display"},"row":{"type":"integer","description":"Row (0-based, default 0)","minimum":0},"col":{"type":"integer","description":"Column (0-based, default 0)","minimum":0},"clear":{"type":"boolean","description":"Clear display before printing (default false)"}},"required":["text"]})=",
             [](const JsonObject& params) -> String {
                 const char* text = params["text"] | "";
                 int row = params["row"] | 0;
@@ -48,7 +48,7 @@ public:
                 bool clear = params["clear"] | false;
 
                 if (row < 0 || row >= cfg.rows)
-                    return String(R"({"error":"Row must be 0-)") + (cfg.rows - 1) + "\"}";
+                    return String(R"=({"error":"Row must be 0-)") + (cfg.rows - 1) + "\"}";
                 if (col < 0 || col >= cfg.cols)
                     return String(R"({"error":"Column must be 0-)") + (cfg.cols - 1) + "\"}";
 
@@ -98,7 +98,7 @@ public:
                 Wire.beginTransmission(cfg.address);
                 Wire.endTransmission();
 #endif
-                return R"({"cleared":true})";
+                return R"({"cleared":true})=";
             });
 
         // --- lcd_setCursor ---
@@ -109,7 +109,7 @@ public:
                 int col = params["col"] | 0;
 
                 if (row < 0 || row >= cfg.rows)
-                    return String(R"({"error":"Row must be 0-)") + (cfg.rows - 1) + "\"}";
+                    return String(R"=({"error":"Row must be 0-)") + (cfg.rows - 1) + "\"}";
                 if (col < 0 || col >= cfg.cols)
                     return String(R"({"error":"Column must be 0-)") + (cfg.cols - 1) + "\"}";
 
@@ -135,11 +135,11 @@ public:
             [](const JsonObject& params) -> String {
                 int slot = params["slot"] | 0;
                 if (slot < 0 || slot > 7)
-                    return R"({"error":"Slot must be 0-7"})";
+                    return R"({"error":"Slot must be 0-7"})=";
 
                 auto pattern = params["pattern"];
                 if (!pattern.is<JsonArray>() || pattern.size() != 8)
-                    return R"({"error":"Pattern must be array of 8 integers (0-31)"})";
+                    return R"=({"error":"Pattern must be array of 8 integers (0-31)"})=";
 
                 return String("{\"created\":true,\"slot\":") + slot + "}";
             });

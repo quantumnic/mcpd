@@ -178,8 +178,8 @@ public:
                 GPSData& d = data();
 
                 if (!d.fix) {
-                    return R"({"fix":false,"satellites":)" + String(d.satellites) +
-                           R"(,"message":"No GPS fix yet. Ensure antenna has clear sky view."})";
+                    return R"=({"fix":false,"satellites":)" + String(d.satellites) +
+                           R"(,"message":"No GPS fix yet. Ensure antenna has clear sky view."})=";
                 }
 
                 char latBuf[16], lonBuf[16], altBuf[16], hdopBuf[16];
@@ -261,7 +261,7 @@ public:
 
         // gps_distance — distance to a waypoint
         server.addTool("gps_distance", "Calculate distance from current position to a target coordinate, or set/clear a waypoint",
-            R"({"type":"object","properties":{"lat":{"type":"number","description":"Target latitude (-90 to 90)","minimum":-90,"maximum":90},"lon":{"type":"number","description":"Target longitude (-180 to 180)","minimum":-180,"maximum":180},"set_waypoint":{"type":"boolean","description":"If true, save this as a persistent waypoint for future distance checks"}},"required":[]})",
+            R"=({"type":"object","properties":{"lat":{"type":"number","description":"Target latitude (-90 to 90)","minimum":-90,"maximum":90},"lon":{"type":"number","description":"Target longitude (-180 to 180)","minimum":-180,"maximum":180},"set_waypoint":{"type":"boolean","description":"If true, save this as a persistent waypoint for future distance checks"}},"required":[]})=",
             [](const JsonObject& args) -> String {
                 processSerial();
                 GPSData& d = data();

@@ -37,12 +37,12 @@ public:
     static void attach(Server& server) {
         // dac_write — write raw 8-bit value to DAC
         server.addTool("dac_write", "Write a raw 8-bit value (0-255) to an ESP32 DAC pin (GPIO 25 or 26)",
-            R"({"type":"object","properties":{"pin":{"type":"integer","enum":[25,26],"description":"DAC-capable GPIO pin (25 = DAC1, 26 = DAC2)"},"value":{"type":"integer","minimum":0,"maximum":255,"description":"Output value (0 = 0V, 255 ≈ 3.3V)"}},"required":["pin","value"]})",
+             R"=({"type":"object","properties":{"pin":{"type":"integer","enum":[25,26],"description":"DAC-capable GPIO pin (25 = DAC1, 26 = DAC2)"},"value":{"type":"integer","minimum":0,"maximum":255,"description":"Output value (0 = 0V, 255 ~ 3.3V)"}},"required":["pin","value"]})=",
             [](const JsonObject& args) -> String {
                 int pin = args["pin"];
                 int value = args["value"];
                 int ch = pinToChannel(pin);
-                if (ch < 0) return R"({"error":"Invalid DAC pin. Use 25 (DAC1) or 26 (DAC2)"})";
+                if (ch < 0) return R"=({"error":"Invalid DAC pin. Use 25 (DAC1) or 26 (DAC2)"})=";
                 if (value < 0 || value > 255) return R"({"error":"Value must be 0-255"})";
 
 #ifdef ESP32
@@ -62,13 +62,13 @@ public:
 
         // dac_write_voltage — write a voltage value to DAC
         server.addTool("dac_write_voltage", "Write a voltage (0-3.3V) to an ESP32 DAC pin",
-            R"({"type":"object","properties":{"pin":{"type":"integer","enum":[25,26],"description":"DAC-capable GPIO pin (25 = DAC1, 26 = DAC2)"},"voltage":{"type":"number","minimum":0,"maximum":3.3,"description":"Desired output voltage (0-3.3V)"}},"required":["pin","voltage"]})",
+            R"=({"type":"object","properties":{"pin":{"type":"integer","enum":[25,26],"description":"DAC-capable GPIO pin (25 = DAC1, 26 = DAC2)"},"voltage":{"type":"number","minimum":0,"maximum":3.3,"description":"Desired output voltage (0-3.3V)"}},"required":["pin","voltage"]})=",
             [](const JsonObject& args) -> String {
                 int pin = args["pin"];
                 float voltage = args["voltage"] | 0.0f;
                 int ch = pinToChannel(pin);
-                if (ch < 0) return R"({"error":"Invalid DAC pin. Use 25 (DAC1) or 26 (DAC2)"})";
-                if (voltage < 0.0f || voltage > 3.3f) return R"({"error":"Voltage must be 0-3.3V"})";
+                if (ch < 0) return R"=({"error":"Invalid DAC pin. Use 25 (DAC1) or 26 (DAC2)"})=";
+                if (voltage < 0.0f || voltage > 3.3f) return R"=({"error":"Voltage must be 0-3.3V"})=";
 
                 uint8_t value = (uint8_t)(voltage / 3.3f * 255.0f + 0.5f);
 #ifdef ESP32

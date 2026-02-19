@@ -68,7 +68,7 @@ public:
 
         // --- rtc_get ---
         server.addTool("rtc_get", "Read current date and time from the RTC",
-            R"({"type":"object","properties":{"format":{"type":"string","enum":["iso","components"],"description":"Output format (default: iso)"}}})",
+            R"=({"type":"object","properties":{"format":{"type":"string","enum":["iso","components"],"description":"Output format (default: iso)"}}})=",
             [](const JsonObject& params) -> String {
                 const char* fmt = params["format"] | "iso";
 
@@ -145,7 +145,7 @@ public:
 
         // --- rtc_alarm ---
         server.addTool("rtc_alarm", "Set or check RTC alarm (DS3231 has 2 alarms)",
-            R"({"type":"object","properties":{"alarm":{"type":"integer","enum":[1,2],"description":"Alarm number (1 or 2)"},"action":{"type":"string","enum":["set","clear","check"],"description":"Action to perform"},"hour":{"type":"integer","minimum":0,"maximum":23},"minute":{"type":"integer","minimum":0,"maximum":59},"second":{"type":"integer","minimum":0,"maximum":59,"description":"Alarm 1 only"}},"required":["alarm","action"]})",
+            R"=({"type":"object","properties":{"alarm":{"type":"integer","enum":[1,2],"description":"Alarm number (1 or 2)"},"action":{"type":"string","enum":["set","clear","check"],"description":"Action to perform"},"hour":{"type":"integer","minimum":0,"maximum":23},"minute":{"type":"integer","minimum":0,"maximum":59},"second":{"type":"integer","minimum":0,"maximum":59,"description":"Alarm 1 only"}},"required":["alarm","action"]})=",
             [](const JsonObject& params) -> String {
                 int alarmNum = params["alarm"] | 1;
                 const char* action = params["action"] | "check";
