@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.27.1] - 2026-02-20
+
+### Tests
+- Added **65 new tests** for previously uncovered modules:
+  - 19 Auth tests (API key, multi-key, bearer token, X-API-Key header, query param, custom callback, disable, priority)
+  - 21 Platform HAL tests (WiFi connect/disconnect/AP/info, GPIO digital/analog read/write, System heap/CPU/restart/uptime, composite platform)
+  - 6 Metrics tests (initial state, request recording, error tracking, SSE clients, uptime)
+  - 4 Diagnostics tool tests (registration, description, tool call output, read-only hint)
+  - 4 Tool annotations tests (destructiveHint, title, idempotentHint, openWorldHint)
+  - 2 RateLimit extended tests (burst capacity, total stats tracking)
+  - 9 Server edge case tests (empty method, missing params, version in initialize, capabilities, duplicate tools)
+- Enhanced WebServer mock with `_testSetHeader()`, `_testSetArg()`, and named arg lookup support
+- Total native tests: **718** (was 653)
+
 ## [0.24.0] - 2026-02-19
 
 ### Added

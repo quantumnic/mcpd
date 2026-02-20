@@ -428,6 +428,7 @@ public:
     int _responseCode = 0;
     String _lastContentType;
     std::map<String, String> _responseHeaders;
+    std::map<String, String> _args;
 
     WebServer(uint16_t port) : _port(port) {}
 
@@ -445,6 +446,8 @@ public:
 
     String arg(const char* name) {
         if (strcmp(name, "plain") == 0) return _body;
+        auto it = _args.find(String(name));
+        if (it != _args.end()) return it->second;
         return "";
     }
 
@@ -468,6 +471,8 @@ public:
     // Test helpers
     void _setBody(const String& body) { _body = body; }
     void _setHeader(const char* name, const String& value) { _headers[String(name)] = value; }
+    void _testSetHeader(const char* name, const String& value) { _headers[String(name)] = value; }
+    void _testSetArg(const char* name, const String& value) { _args[String(name)] = value; }
     void _simulateRequest(const char* path, int method) {
         for (auto& r : _routes) {
             if (strcmp(r.path, path) == 0 && r.method == method) {
