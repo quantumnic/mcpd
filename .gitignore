@@ -14,3 +14,4 @@ test/native/test_jsonrpc
 test/native/test_mcp_http
 test_tools
 test/native/test_infrastructure
+test/native/test_modules
