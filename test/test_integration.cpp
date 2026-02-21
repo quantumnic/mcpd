@@ -608,6 +608,178 @@ TEST(integ_initialize_without_capabilities_when_empty) {
 }
 
 // ════════════════════════════════════════════════════════════════════════
+// Tool Call Hooks Tests
+// ════════════════════════════════════════════════════════════════════════
+
+TEST(hook_before_tool_call_allows) {
+    Server server("test", 80);
+    server.addTool("my_tool", "desc", R"({"type":"object"})",
+        [](const JsonObject&) -> String { return "ok"; });
+
+    bool hookCalled = false;
+    server.onBeforeToolCall([&](const Server::ToolCallContext& ctx) -> bool {
+        hookCalled = true;
+        ASSERT_STR_EQ(ctx.toolName.c_str(), "my_tool");
+        return true;  // allow
+    });
+
+    server._processJsonRpc(R"({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","clientInfo":{"name":"test"}}})");
+    String result = server._processJsonRpc(R"({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"my_tool","arguments":{}}})");
+    ASSERT(hookCalled);
+    ASSERT(result.indexOf("ok") >= 0);
+    ASSERT(result.indexOf("error") < 0);
+}
+
+TEST(hook_before_tool_call_rejects) {
+    Server server("test", 80);
+    server.addTool("restricted", "desc", R"({"type":"object"})",
+        [](const JsonObject&) -> String { return "should not reach"; });
+
+    server.onBeforeToolCall([](const Server::ToolCallContext&) -> bool {
+        return false;  // reject
+    });
+
+    server._processJsonRpc(R"({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","clientInfo":{"name":"test"}}})");
+    String result = server._processJsonRpc(R"({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"restricted","arguments":{}}})");
+    ASSERT(result.indexOf("Tool call rejected") >= 0);
+    ASSERT(result.indexOf("should not reach") < 0);
+}
+
+TEST(hook_after_tool_call_receives_context) {
+    Server server("test", 80);
+    server.addTool("timed_tool", "desc", R"({"type":"object"})",
+        [](const JsonObject&) -> String { return "result"; });
+
+    String capturedName;
+    bool capturedIsError = true;
+    server.onAfterToolCall([&](const Server::ToolCallContext& ctx) {
+        capturedName = ctx.toolName;
+        capturedIsError = ctx.isError;
+    });
+
+    server._processJsonRpc(R"({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","clientInfo":{"name":"test"}}})");
+    server._processJsonRpc(R"({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"timed_tool","arguments":{}}})");
+    ASSERT_STR_EQ(capturedName.c_str(), "timed_tool");
+    ASSERT(!capturedIsError);
+}
+
+TEST(hook_after_tool_call_detects_error) {
+    Server server("test", 80);
+    server.addTool("bad_tool", "desc", R"({"type":"object"})",
+        [](const JsonObject&) -> String { throw 42; return ""; });
+
+    bool capturedIsError = false;
+    server.onAfterToolCall([&](const Server::ToolCallContext& ctx) {
+        capturedIsError = ctx.isError;
+    });
+
+    server._processJsonRpc(R"({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","clientInfo":{"name":"test"}}})");
+    server._processJsonRpc(R"({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"bad_tool","arguments":{}}})");
+    ASSERT(capturedIsError);
+}
+
+TEST(hook_before_and_after_both_called) {
+    Server server("test", 80);
+    server.addTool("dual_hook", "desc", R"({"type":"object"})",
+        [](const JsonObject&) -> String { return "ok"; });
+
+    int callOrder = 0;
+    int beforeOrder = 0, afterOrder = 0;
+
+    server.onBeforeToolCall([&](const Server::ToolCallContext&) -> bool {
+        beforeOrder = ++callOrder;
+        return true;
+    });
+    server.onAfterToolCall([&](const Server::ToolCallContext&) {
+        afterOrder = ++callOrder;
+    });
+
+    server._processJsonRpc(R"({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","clientInfo":{"name":"test"}}})");
+    server._processJsonRpc(R"({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"dual_hook","arguments":{}}})");
+    ASSERT_EQ(beforeOrder, 1);
+    ASSERT_EQ(afterOrder, 2);
+}
+
+TEST(hook_before_reject_skips_after) {
+    Server server("test", 80);
+    server.addTool("skip_after", "desc", R"({"type":"object"})",
+        [](const JsonObject&) -> String { return "ok"; });
+
+    bool afterCalled = false;
+
+    server.onBeforeToolCall([](const Server::ToolCallContext&) -> bool {
+        return false;  // reject
+    });
+    server.onAfterToolCall([&](const Server::ToolCallContext&) {
+        afterCalled = true;
+    });
+
+    server._processJsonRpc(R"({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","clientInfo":{"name":"test"}}})");
+    server._processJsonRpc(R"({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"skip_after","arguments":{}}})");
+    ASSERT(!afterCalled);
+}
+
+TEST(hook_no_hooks_set_works_normally) {
+    Server server("test", 80);
+    server.addTool("normal_tool", "desc", R"({"type":"object"})",
+        [](const JsonObject&) -> String { return "normal"; });
+
+    server._processJsonRpc(R"({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","clientInfo":{"name":"test"}}})");
+    String result = server._processJsonRpc(R"({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"normal_tool","arguments":{}}})");
+    ASSERT(result.indexOf("normal") >= 0);
+}
+
+TEST(hook_before_receives_tool_args) {
+    Server server("test", 80);
+    server.addTool("args_tool", "desc", R"({"type":"object","properties":{"name":{"type":"string"}}})",
+        [](const JsonObject& args) -> String { return args["name"].as<String>(); });
+
+    String capturedArg;
+    server.onBeforeToolCall([&](const Server::ToolCallContext& ctx) -> bool {
+        if (ctx.args) {
+            capturedArg = (*ctx.args)["name"].as<String>();
+        }
+        return true;
+    });
+
+    server._processJsonRpc(R"({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","clientInfo":{"name":"test"}}})");
+    server._processJsonRpc(R"({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"args_tool","arguments":{"name":"hello"}}})");
+    ASSERT_STR_EQ(capturedArg.c_str(), "hello");
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// JSON-RPC Error With Data Tests
+// ════════════════════════════════════════════════════════════════════════
+
+TEST(error_with_data_includes_data_field) {
+    Server server("test", 80);
+    String err = server.jsonRpcErrorWithData(JsonVariant(), -32000, "Custom error",
+        R"({"detail":"something broke","code":42})");
+    ASSERT(err.indexOf("Custom error") >= 0);
+    ASSERT(err.indexOf("something broke") >= 0);
+    ASSERT(err.indexOf("42") >= 0);
+}
+
+TEST(error_with_data_empty_data) {
+    Server server("test", 80);
+    String err = server.jsonRpcErrorWithData(JsonVariant(), -32000, "No data", "");
+    ASSERT(err.indexOf("No data") >= 0);
+    // Should not have a data field
+    ASSERT(err.indexOf("\"data\"") < 0);
+}
+
+TEST(error_with_data_preserves_id) {
+    Server server("test", 80);
+    JsonDocument doc;
+    doc["id"] = 42;
+    String err = server.jsonRpcErrorWithData(doc["id"], -32602, "Bad params",
+        R"({"missing":"field_x"})");
+    ASSERT(err.indexOf("42") >= 0);
+    ASSERT(err.indexOf("Bad params") >= 0);
+    ASSERT(err.indexOf("field_x") >= 0);
+}
+
+// ════════════════════════════════════════════════════════════════════════
 
 int main() {
     TEST_SUMMARY();

@@ -44,7 +44,7 @@
 #include "MCPTransportBLE.h"
 #endif
 
-#define MCPD_VERSION "0.29.0"
+#define MCPD_VERSION "0.29.1"
 #define MCPD_MCP_PROTOCOL_VERSION "2025-03-26"
 
 namespace mcpd {
@@ -263,6 +263,46 @@ public:
     /** Access the Prometheus metrics module */
     Metrics& metrics() { return _metrics; }
 
+    // ── Tool Call Hooks ─────────────────────────────────────────────────
+
+    /**
+     * Context passed to tool call hooks.
+     */
+    struct ToolCallContext {
+        String toolName;          // Name of the tool being called
+        const JsonObject* args;   // Tool arguments (read-only in before hook)
+        unsigned long startMs;    // millis() when call started (after hook only)
+        unsigned long durationMs; // Call duration in ms (after hook only)
+        bool isError;             // Whether the tool returned an error (after hook only)
+    };
+
+    /**
+     * Before-call hook. Return true to proceed, false to reject the call.
+     * When rejected, the server returns a "Tool call rejected" error.
+     */
+    using BeforeToolCallHook = std::function<bool(const ToolCallContext& ctx)>;
+
+    /**
+     * After-call hook. Called after tool execution completes.
+     * Useful for logging, metrics, auditing.
+     */
+    using AfterToolCallHook = std::function<void(const ToolCallContext& ctx)>;
+
+    /** Set a hook called before every tool call. Return false to reject. */
+    void onBeforeToolCall(BeforeToolCallHook hook) { _beforeToolCallHook = hook; }
+
+    /** Set a hook called after every tool call completes. */
+    void onAfterToolCall(AfterToolCallHook hook) { _afterToolCallHook = hook; }
+
+    // ── JSON-RPC Error Data ────────────────────────────────────────────
+
+    /**
+     * Create a JSON-RPC error response with optional structured data.
+     * Per JSON-RPC spec, errors may include a "data" field with additional info.
+     */
+    String jsonRpcErrorWithData(JsonVariant id, int code, const char* message,
+                                const String& dataJson);
+
     // ── Lifecycle Hooks ────────────────────────────────────────────────
 
     using LifecycleCallback = std::function<void()>;
@@ -368,6 +408,10 @@ private:
     InitCallback _onInitializeCb;
     LifecycleCallback _onConnectCb;
     LifecycleCallback _onDisconnectCb;
+
+    // Tool call hooks
+    BeforeToolCallHook _beforeToolCallHook;
+    AfterToolCallHook _afterToolCallHook;
 
     std::vector<MCPTool> _tools;
     std::vector<std::pair<String, MCPRichToolHandler>> _richTools;  // name → handler

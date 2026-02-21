@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.29.1] - 2026-02-21
+
+### Features
+- **Tool call hooks** — `onBeforeToolCall()` and `onAfterToolCall()` middleware for logging, access control, metrics, and auditing. Before-hook can reject calls; after-hook receives timing and error info via `ToolCallContext`.
+- **Structured JSON-RPC error data** — `jsonRpcErrorWithData()` public API for returning errors with an optional `data` field per JSON-RPC spec.
+
+### Fixes
+- **Fix parameter shadowing** in `_handleResourcesRead()` — local `params` variable renamed to `templateVars` to avoid shadowing the function parameter (could cause issues on strict compilers).
+- **Fix version mismatch in tests** — 4 tests were checking for "0.28.0" instead of the current version.
+
+### Tests
+- Added **11 new tests** for tool call hooks (8) and structured error data (3):
+  - Before-hook allow/reject, after-hook context/error detection, hook ordering, rejection skips after-hook, argument forwarding
+  - Error-with-data serialization, empty data, ID preservation
+- **Total: 1028 tests** (1017 → 1028)
+
 ## [0.29.0] - 2026-02-21
 
 ### Features

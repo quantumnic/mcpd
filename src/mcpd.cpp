@@ -703,6 +703,24 @@ String Server::_handleToolsCall(JsonVariant params, JsonVariant id) {
         if (tool.name == toolName) {
             JsonObject arguments = params["arguments"].as<JsonObject>();
 
+            // Before-call hook: allow rejection
+            if (_beforeToolCallHook) {
+                ToolCallContext ctx;
+                ctx.toolName = toolName;
+                ctx.args = &arguments;
+                ctx.startMs = millis();
+                ctx.durationMs = 0;
+                ctx.isError = false;
+                if (!_beforeToolCallHook(ctx)) {
+                    if (!requestId.isEmpty()) {
+                        _requestTracker.completeRequest(requestId);
+                    }
+                    return _jsonRpcError(id, -32600, "Tool call rejected");
+                }
+            }
+
+            unsigned long callStartMs = millis();
+
             // Check if this tool has a rich handler
             MCPRichToolHandler richHandler = nullptr;
             for (const auto& rh : _richTools) {
@@ -713,6 +731,7 @@ String Server::_handleToolsCall(JsonVariant params, JsonVariant id) {
             }
 
             String resultStr;
+            bool callIsError = false;
 
             if (richHandler) {
                 // Use rich handler for structured content
@@ -721,21 +740,22 @@ String Server::_handleToolsCall(JsonVariant params, JsonVariant id) {
                     toolResult = richHandler(arguments);
                 } catch (...) {
                     toolResult = MCPToolResult::error("Internal tool error");
+                    callIsError = true;
                 }
 
                 JsonDocument result;
                 JsonObject resultObj = result.to<JsonObject>();
                 toolResult.toJson(resultObj);
                 serializeJson(result, resultStr);
+                if (toolResult.isError) callIsError = true;
             } else {
                 // Use simple handler (backward compatible)
                 String handlerResult;
-                bool isError = false;
                 try {
                     handlerResult = tool.handler(arguments);
                 } catch (...) {
                     handlerResult = "Internal tool error";
-                    isError = true;
+                    callIsError = true;
                 }
 
                 JsonDocument result;
@@ -743,10 +763,21 @@ String Server::_handleToolsCall(JsonVariant params, JsonVariant id) {
                 JsonObject textContent = content.add<JsonObject>();
                 textContent["type"] = "text";
                 textContent["text"] = handlerResult;
-                if (isError) {
+                if (callIsError) {
                     result["isError"] = true;
                 }
                 serializeJson(result, resultStr);
+            }
+
+            // After-call hook: logging/metrics
+            if (_afterToolCallHook) {
+                ToolCallContext ctx;
+                ctx.toolName = toolName;
+                ctx.args = &arguments;
+                ctx.startMs = callStartMs;
+                ctx.durationMs = millis() - callStartMs;
+                ctx.isError = callIsError;
+                _afterToolCallHook(ctx);
             }
 
             // Complete request tracking
@@ -816,9 +847,9 @@ String Server::_handleResourcesRead(JsonVariant params, JsonVariant id) {
 
     // Try matching against resource templates
     for (const auto& tmpl : _resourceTemplates) {
-        std::map<String, String> params;
-        if (tmpl.match(String(uri), params)) {
-            String content = tmpl.handler(params);
+        std::map<String, String> templateVars;
+        if (tmpl.match(String(uri), templateVars)) {
+            String content = tmpl.handler(templateVars);
 
             JsonDocument result;
             JsonArray contents = result["contents"].to<JsonArray>();
@@ -1108,6 +1139,30 @@ String Server::_jsonRpcResult(JsonVariant id, const String& resultJson) {
     JsonDocument resultDoc;
     deserializeJson(resultDoc, resultJson);
     doc["result"] = resultDoc.as<JsonVariant>();
+
+    String output;
+    serializeJson(doc, output);
+    return output;
+}
+
+String Server::jsonRpcErrorWithData(JsonVariant id, int code, const char* message,
+                                    const String& dataJson) {
+    JsonDocument doc;
+    doc["jsonrpc"] = "2.0";
+    if (!id.isNull()) {
+        doc["id"] = id;
+    } else {
+        doc["id"] = nullptr;
+    }
+    JsonObject error = doc["error"].to<JsonObject>();
+    error["code"] = code;
+    error["message"] = message;
+
+    if (!dataJson.isEmpty()) {
+        JsonDocument dataDoc;
+        deserializeJson(dataDoc, dataJson);
+        error["data"] = dataDoc.as<JsonVariant>();
+    }
 
     String output;
     serializeJson(doc, output);
