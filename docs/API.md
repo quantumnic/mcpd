@@ -495,3 +495,21 @@ mcp.addTool("gpio_write", "Write a GPIO pin",
 ```
 
 Disabled by default for backward compatibility. Enable with `mcp.enableInputValidation()`.
+
+### Output Validation
+
+When a tool declares an `outputSchema`, mcpd can validate the tool's structured output after execution:
+
+```cpp
+mcp.enableOutputValidation();  // Enable before begin()
+```
+
+If a tool's JSON output violates its declared `outputSchema` (wrong types, missing required fields, out-of-range values), the result is replaced with an error:
+
+```json
+{"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"Output validation failed: Invalid arguments: 'count' must be integer, got string"}],"isError":true}}
+```
+
+This catches handler bugs during development before invalid data reaches the client. Non-JSON output from tools with `outputSchema` gracefully skips validation (no `structuredContent` is generated).
+
+Disabled by default. Enable with `mcp.enableOutputValidation()`.

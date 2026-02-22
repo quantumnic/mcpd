@@ -1,7 +1,8 @@
 /**
- * mcpd — Input Validation Tests
+ * mcpd — Input & Output Validation Tests
  *
- * Tests for MCPValidation.h (standalone) and Server input validation integration.
+ * Tests for MCPValidation.h (standalone), Server input validation,
+ * and Server output validation integration.
  */
 
 #include "test_framework.h"
@@ -507,6 +508,325 @@ TEST(jsonTypeName_values) {
     ASSERT_STR_CONTAINS(jsonTypeName(doc["s"]), "string");
     ASSERT_STR_CONTAINS(jsonTypeName(doc["i"]), "integer");
     ASSERT_STR_CONTAINS(jsonTypeName(doc["b"]), "boolean");
+}
+
+// Helper for server integration tests
+static String dispatch(Server& s, const char* json) {
+    return s._processJsonRpc(String(json));
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// validateValue — Output Validation (standalone)
+// ═══════════════════════════════════════════════════════════════════════
+
+TEST(validateValue_object_valid) {
+    JsonDocument schema;
+    deserializeJson(schema, R"({"type":"object","properties":{"name":{"type":"string"},"age":{"type":"integer"}},"required":["name"]})");
+    JsonDocument val;
+    deserializeJson(val, R"({"name":"Alice","age":30})");
+    ValidationResult vr = validateValue(val.as<JsonVariant>(), schema.as<JsonObject>());
+    ASSERT_TRUE(vr.valid);
+}
+
+TEST(validateValue_object_missing_required) {
+    JsonDocument schema;
+    deserializeJson(schema, R"({"type":"object","properties":{"name":{"type":"string"}},"required":["name"]})");
+    JsonDocument val;
+    deserializeJson(val, R"({"age":30})");
+    ValidationResult vr = validateValue(val.as<JsonVariant>(), schema.as<JsonObject>());
+    ASSERT_FALSE(vr.valid);
+    ASSERT_STR_CONTAINS(vr.toString().c_str(), "name");
+}
+
+TEST(validateValue_wrong_root_type) {
+    JsonDocument schema;
+    deserializeJson(schema, R"({"type":"object"})");
+    JsonDocument val;
+    deserializeJson(val, R"("hello")");
+    ValidationResult vr = validateValue(val.as<JsonVariant>(), schema.as<JsonObject>());
+    ASSERT_FALSE(vr.valid);
+    ASSERT_STR_CONTAINS(vr.toString().c_str(), "must be object");
+}
+
+TEST(validateValue_string_valid) {
+    JsonDocument schema;
+    deserializeJson(schema, R"({"type":"string","minLength":2,"maxLength":10})");
+    JsonDocument val;
+    deserializeJson(val, R"("hello")");
+    ValidationResult vr = validateValue(val.as<JsonVariant>(), schema.as<JsonObject>());
+    ASSERT_TRUE(vr.valid);
+}
+
+TEST(validateValue_string_too_short) {
+    JsonDocument schema;
+    deserializeJson(schema, R"({"type":"string","minLength":5})");
+    JsonDocument val;
+    deserializeJson(val, R"("hi")");
+    ValidationResult vr = validateValue(val.as<JsonVariant>(), schema.as<JsonObject>());
+    ASSERT_FALSE(vr.valid);
+    ASSERT_STR_CONTAINS(vr.toString().c_str(), "length");
+}
+
+TEST(validateValue_number_in_range) {
+    JsonDocument schema;
+    deserializeJson(schema, R"({"type":"number","minimum":0,"maximum":100})");
+    JsonDocument val;
+    deserializeJson(val, "42");
+    ValidationResult vr = validateValue(val.as<JsonVariant>(), schema.as<JsonObject>());
+    ASSERT_TRUE(vr.valid);
+}
+
+TEST(validateValue_number_out_of_range) {
+    JsonDocument schema;
+    deserializeJson(schema, R"({"type":"number","maximum":50})");
+    JsonDocument val;
+    deserializeJson(val, "75");
+    ValidationResult vr = validateValue(val.as<JsonVariant>(), schema.as<JsonObject>());
+    ASSERT_FALSE(vr.valid);
+    ASSERT_STR_CONTAINS(vr.toString().c_str(), "<=");
+}
+
+TEST(validateValue_enum_valid) {
+    JsonDocument schema;
+    deserializeJson(schema, R"({"type":"string","enum":["on","off","standby"]})");
+    JsonDocument val;
+    deserializeJson(val, R"("on")");
+    ValidationResult vr = validateValue(val.as<JsonVariant>(), schema.as<JsonObject>());
+    ASSERT_TRUE(vr.valid);
+}
+
+TEST(validateValue_enum_invalid) {
+    JsonDocument schema;
+    deserializeJson(schema, R"({"type":"string","enum":["on","off"]})");
+    JsonDocument val;
+    deserializeJson(val, R"("maybe")");
+    ValidationResult vr = validateValue(val.as<JsonVariant>(), schema.as<JsonObject>());
+    ASSERT_FALSE(vr.valid);
+    ASSERT_STR_CONTAINS(vr.toString().c_str(), "enum");
+}
+
+TEST(validateValue_array_valid) {
+    JsonDocument schema;
+    deserializeJson(schema, R"({"type":"array","minItems":1,"maxItems":5})");
+    JsonDocument val;
+    deserializeJson(val, R"([1,2,3])");
+    ValidationResult vr = validateValue(val.as<JsonVariant>(), schema.as<JsonObject>());
+    ASSERT_TRUE(vr.valid);
+}
+
+TEST(validateValue_array_too_many) {
+    JsonDocument schema;
+    deserializeJson(schema, R"({"type":"array","maxItems":2})");
+    JsonDocument val;
+    deserializeJson(val, R"([1,2,3,4])");
+    ValidationResult vr = validateValue(val.as<JsonVariant>(), schema.as<JsonObject>());
+    ASSERT_FALSE(vr.valid);
+    ASSERT_STR_CONTAINS(vr.toString().c_str(), "<=");
+}
+
+TEST(validateValue_integer_type_check) {
+    JsonDocument schema;
+    deserializeJson(schema, R"({"type":"integer"})");
+    JsonDocument val;
+    deserializeJson(val, R"("notanumber")");
+    ValidationResult vr = validateValue(val.as<JsonVariant>(), schema.as<JsonObject>());
+    ASSERT_FALSE(vr.valid);
+    ASSERT_STR_CONTAINS(vr.toString().c_str(), "must be integer");
+}
+
+TEST(validateValue_boolean_type_check) {
+    JsonDocument schema;
+    deserializeJson(schema, R"({"type":"boolean"})");
+    JsonDocument val;
+    deserializeJson(val, "true");
+    ValidationResult vr = validateValue(val.as<JsonVariant>(), schema.as<JsonObject>());
+    ASSERT_TRUE(vr.valid);
+}
+
+TEST(validateValue_no_schema_type) {
+    // Schema without type constraint should pass anything
+    JsonDocument schema;
+    deserializeJson(schema, R"({})");
+    JsonDocument val;
+    deserializeJson(val, R"("anything")");
+    ValidationResult vr = validateValue(val.as<JsonVariant>(), schema.as<JsonObject>());
+    ASSERT_TRUE(vr.valid);
+}
+
+TEST(validateValue_nested_object) {
+    JsonDocument schema;
+    deserializeJson(schema, R"({"type":"object","properties":{"status":{"type":"string"},"data":{"type":"object","properties":{"value":{"type":"number","minimum":0}},"required":["value"]}},"required":["status","data"]})");
+    JsonDocument val;
+    deserializeJson(val, R"({"status":"ok","data":{"value":42}})");
+    ValidationResult vr = validateValue(val.as<JsonVariant>(), schema.as<JsonObject>());
+    ASSERT_TRUE(vr.valid);
+}
+
+TEST(validateValue_nested_object_invalid) {
+    JsonDocument schema;
+    deserializeJson(schema, R"({"type":"object","properties":{"data":{"type":"object","properties":{"value":{"type":"number","minimum":0}},"required":["value"]}},"required":["data"]})");
+    JsonDocument val;
+    deserializeJson(val, R"({"data":{}})");
+    ValidationResult vr = validateValue(val.as<JsonVariant>(), schema.as<JsonObject>());
+    ASSERT_FALSE(vr.valid);
+    ASSERT_STR_CONTAINS(vr.toString().c_str(), "value");
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Server Output Validation Integration
+// ═══════════════════════════════════════════════════════════════════════
+
+TEST(server_output_validation_disabled_by_default) {
+    Server s("test");
+    ASSERT_FALSE(s.isOutputValidationEnabled());
+}
+
+TEST(server_output_validation_enable) {
+    Server s("test");
+    s.enableOutputValidation();
+    ASSERT_TRUE(s.isOutputValidationEnabled());
+    s.enableOutputValidation(false);
+    ASSERT_FALSE(s.isOutputValidationEnabled());
+}
+
+TEST(server_output_validation_valid_output) {
+    Server s("test");
+    s.enableOutputValidation();
+
+    MCPTool tool;
+    tool.name = "get_status";
+    tool.description = "Get device status";
+    tool.inputSchemaJson = R"({"type":"object","properties":{}})";
+    tool.outputSchemaJson = R"({"type":"object","properties":{"status":{"type":"string"},"uptime":{"type":"integer"}},"required":["status"]})";
+    tool.handler = [](JsonObject) -> String {
+        return R"({"status":"ok","uptime":12345})";
+    };
+    s.addTool(tool);
+
+    String r = dispatch(s, R"({"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_status","arguments":{}},"id":1})");
+    // Should succeed — valid output
+    ASSERT_STR_NOT_CONTAINS(r.c_str(), "Output validation failed");
+    ASSERT_STR_CONTAINS(r.c_str(), "structuredContent");
+    ASSERT_STR_CONTAINS(r.c_str(), "\"status\":\"ok\"");
+}
+
+TEST(server_output_validation_invalid_output_type) {
+    Server s("test");
+    s.enableOutputValidation();
+
+    MCPTool tool;
+    tool.name = "bad_output";
+    tool.description = "Returns wrong type";
+    tool.inputSchemaJson = R"({"type":"object","properties":{}})";
+    tool.outputSchemaJson = R"({"type":"object","properties":{"count":{"type":"integer"}},"required":["count"]})";
+    tool.handler = [](JsonObject) -> String {
+        return R"({"count":"notanumber"})";
+    };
+    s.addTool(tool);
+
+    String r = dispatch(s, R"({"jsonrpc":"2.0","method":"tools/call","params":{"name":"bad_output","arguments":{}},"id":1})");
+    ASSERT_STR_CONTAINS(r.c_str(), "Output validation failed");
+    ASSERT_STR_CONTAINS(r.c_str(), "isError");
+}
+
+TEST(server_output_validation_missing_required) {
+    Server s("test");
+    s.enableOutputValidation();
+
+    MCPTool tool;
+    tool.name = "missing_field";
+    tool.description = "Misses required field";
+    tool.inputSchemaJson = R"({"type":"object","properties":{}})";
+    tool.outputSchemaJson = R"({"type":"object","properties":{"name":{"type":"string"},"value":{"type":"number"}},"required":["name","value"]})";
+    tool.handler = [](JsonObject) -> String {
+        return R"({"name":"sensor"})";
+    };
+    s.addTool(tool);
+
+    String r = dispatch(s, R"({"jsonrpc":"2.0","method":"tools/call","params":{"name":"missing_field","arguments":{}},"id":1})");
+    ASSERT_STR_CONTAINS(r.c_str(), "Output validation failed");
+    ASSERT_STR_CONTAINS(r.c_str(), "value");
+    ASSERT_STR_CONTAINS(r.c_str(), "isError");
+}
+
+TEST(server_output_validation_non_json_output_passes) {
+    // If handler returns non-JSON text, no structuredContent and no validation
+    Server s("test");
+    s.enableOutputValidation();
+
+    MCPTool tool;
+    tool.name = "text_tool";
+    tool.description = "Returns plain text";
+    tool.inputSchemaJson = R"({"type":"object","properties":{}})";
+    tool.outputSchemaJson = R"({"type":"object","properties":{"x":{"type":"number"}}})";
+    tool.handler = [](JsonObject) -> String {
+        return "Just plain text, not JSON";
+    };
+    s.addTool(tool);
+
+    String r = dispatch(s, R"({"jsonrpc":"2.0","method":"tools/call","params":{"name":"text_tool","arguments":{}},"id":1})");
+    // Non-JSON output → no structuredContent → no validation → should pass
+    ASSERT_STR_NOT_CONTAINS(r.c_str(), "Output validation failed");
+    ASSERT_STR_CONTAINS(r.c_str(), "Just plain text");
+}
+
+TEST(server_output_validation_disabled_allows_invalid) {
+    // With output validation disabled, invalid output should pass through
+    Server s("test");
+    // Not calling enableOutputValidation()
+
+    MCPTool tool;
+    tool.name = "no_validate";
+    tool.description = "Invalid output but no validation";
+    tool.inputSchemaJson = R"({"type":"object","properties":{}})";
+    tool.outputSchemaJson = R"({"type":"object","properties":{"x":{"type":"integer"}},"required":["x"]})";
+    tool.handler = [](JsonObject) -> String {
+        return R"({"x":"wrong_type"})";
+    };
+    s.addTool(tool);
+
+    String r = dispatch(s, R"({"jsonrpc":"2.0","method":"tools/call","params":{"name":"no_validate","arguments":{}},"id":1})");
+    ASSERT_STR_NOT_CONTAINS(r.c_str(), "Output validation failed");
+    ASSERT_STR_CONTAINS(r.c_str(), "structuredContent");
+}
+
+TEST(server_output_validation_range_violation) {
+    Server s("test");
+    s.enableOutputValidation();
+
+    MCPTool tool;
+    tool.name = "range_tool";
+    tool.description = "Output with range constraint";
+    tool.inputSchemaJson = R"({"type":"object","properties":{}})";
+    tool.outputSchemaJson = R"({"type":"object","properties":{"percent":{"type":"number","minimum":0,"maximum":100}}})";
+    tool.handler = [](JsonObject) -> String {
+        return R"({"percent":150})";
+    };
+    s.addTool(tool);
+
+    String r = dispatch(s, R"({"jsonrpc":"2.0","method":"tools/call","params":{"name":"range_tool","arguments":{}},"id":1})");
+    ASSERT_STR_CONTAINS(r.c_str(), "Output validation failed");
+    ASSERT_STR_CONTAINS(r.c_str(), "isError");
+}
+
+TEST(server_output_validation_no_outputschema_skips) {
+    // Tool without outputSchema should not be validated even if enabled
+    Server s("test");
+    s.enableOutputValidation();
+
+    MCPTool tool;
+    tool.name = "no_schema";
+    tool.description = "No output schema";
+    tool.inputSchemaJson = R"({"type":"object","properties":{}})";
+    // No outputSchemaJson set
+    tool.handler = [](JsonObject) -> String {
+        return "anything goes";
+    };
+    s.addTool(tool);
+
+    String r = dispatch(s, R"({"jsonrpc":"2.0","method":"tools/call","params":{"name":"no_schema","arguments":{}},"id":1})");
+    ASSERT_STR_NOT_CONTAINS(r.c_str(), "Output validation failed");
+    ASSERT_STR_CONTAINS(r.c_str(), "anything goes");
 }
 
 // ═══════════════════════════════════════════════════════════════════════

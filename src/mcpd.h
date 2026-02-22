@@ -47,7 +47,7 @@
 #include "MCPTransportBLE.h"
 #endif
 
-#define MCPD_VERSION "0.34.0"
+#define MCPD_VERSION "0.35.0"
 #define MCPD_MCP_PROTOCOL_VERSION "2025-11-25"
 #define MCPD_MCP_PROTOCOL_VERSION_COMPAT "2025-03-26"
 
@@ -387,6 +387,19 @@ public:
     /** Check if input validation is enabled */
     bool isInputValidationEnabled() const { return _inputValidation; }
 
+    /**
+     * Enable output validation: after a tool with outputSchema executes,
+     * validate its structured output against the schema. If validation
+     * fails, the tool result is replaced with an error containing
+     * validation details. Useful for development and debugging.
+     *
+     * Disabled by default. Requires enableInputValidation() pattern.
+     */
+    void enableOutputValidation(bool enable = true) { _outputValidation = enable; }
+
+    /** Check if output validation is enabled */
+    bool isOutputValidationEnabled() const { return _outputValidation; }
+
     // ── JSON-RPC Error Data ────────────────────────────────────────────
 
     /**
@@ -504,6 +517,7 @@ private:
     Metrics _metrics;
     TaskManager _taskManager;
     bool _inputValidation = false;
+    bool _outputValidation = false;
     std::map<String, MCPTaskToolHandler> _taskToolHandlers;
     std::map<String, TaskSupport> _taskToolSupport;
 

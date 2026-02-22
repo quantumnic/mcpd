@@ -1,9 +1,9 @@
 /**
- * mcpd — Tool Input Validation
+ * mcpd — Tool Input & Output Validation
  *
- * Lightweight JSON Schema validation for tool call arguments.
- * Validates required fields and basic type constraints against the
- * declared inputSchema before invoking the tool handler.
+ * Lightweight JSON Schema validation for tool call arguments and results.
+ * Validates required fields and basic type constraints against declared
+ * inputSchema (before invocation) and outputSchema (after invocation).
  *
  * Designed for MCU environments: no heap-heavy schema libraries,
  * just practical checks that catch common caller mistakes early.
@@ -276,6 +276,103 @@ inline ValidationResult validateArguments(JsonObject args, JsonObject schema,
                     }
                 }
             }
+        }
+    }
+
+    return result;
+}
+
+/**
+ * Validate a JSON value against a schema (for output validation).
+ * Unlike validateArguments which expects an object, this handles any root type.
+ *
+ * @param value   The JSON value to validate
+ * @param schema  The parsed JSON Schema
+ * @param prefix  Field path prefix for error messages
+ * @return ValidationResult with any errors found
+ */
+inline ValidationResult validateValue(JsonVariant value, JsonObject schema,
+                                       const String& prefix = "") {
+    ValidationResult result;
+
+    // Type check at root level
+    if (schema.containsKey("type")) {
+        const char* expectedType = schema["type"].as<const char*>();
+        if (expectedType && !validateType(value, expectedType)) {
+            String msg = "must be ";
+            msg += expectedType;
+            msg += ", got ";
+            msg += jsonTypeName(value);
+            result.addError(prefix.isEmpty() ? String("(root)") : prefix, msg);
+            return result;
+        }
+
+        // If root is an object, delegate to validateArguments
+        if (strcmp(expectedType, "object") == 0 && value.is<JsonObject>()) {
+            return validateArguments(value.as<JsonObject>(), schema, prefix);
+        }
+    }
+
+    // Enum check
+    if (schema.containsKey("enum")) {
+        JsonArray enumValues = schema["enum"].as<JsonArray>();
+        bool found = false;
+        for (JsonVariant ev : enumValues) {
+            if (value.is<const char*>() && ev.is<const char*>()) {
+                if (strcmp(value.as<const char*>(), ev.as<const char*>()) == 0) { found = true; break; }
+            } else if (value.is<int>() && ev.is<int>()) {
+                if (value.as<int>() == ev.as<int>()) { found = true; break; }
+            } else if (value.is<double>() && ev.is<double>()) {
+                if (value.as<double>() == ev.as<double>()) { found = true; break; }
+            } else if (value.is<bool>() && ev.is<bool>()) {
+                if (value.as<bool>() == ev.as<bool>()) { found = true; break; }
+            }
+        }
+        if (!found) {
+            result.addError(prefix.isEmpty() ? String("(root)") : prefix,
+                            "value not in enum");
+        }
+    }
+
+    // Numeric range
+    if (schema.containsKey("minimum") && (value.is<int>() || value.is<long>() || value.is<float>() || value.is<double>())) {
+        double min = schema["minimum"].as<double>();
+        if (value.as<double>() < min) {
+            result.addError(prefix.isEmpty() ? String("(root)") : prefix,
+                            "must be >= " + String(min, 2));
+        }
+    }
+    if (schema.containsKey("maximum") && (value.is<int>() || value.is<long>() || value.is<float>() || value.is<double>())) {
+        double max = schema["maximum"].as<double>();
+        if (value.as<double>() > max) {
+            result.addError(prefix.isEmpty() ? String("(root)") : prefix,
+                            "must be <= " + String(max, 2));
+        }
+    }
+
+    // String length
+    if (value.is<const char*>()) {
+        size_t len = strlen(value.as<const char*>());
+        if (schema.containsKey("minLength") && len < schema["minLength"].as<size_t>()) {
+            result.addError(prefix.isEmpty() ? String("(root)") : prefix,
+                            "length must be >= " + String((unsigned long)schema["minLength"].as<size_t>()));
+        }
+        if (schema.containsKey("maxLength") && len > schema["maxLength"].as<size_t>()) {
+            result.addError(prefix.isEmpty() ? String("(root)") : prefix,
+                            "length must be <= " + String((unsigned long)schema["maxLength"].as<size_t>()));
+        }
+    }
+
+    // Array length
+    if (value.is<JsonArray>()) {
+        size_t len = value.as<JsonArray>().size();
+        if (schema.containsKey("minItems") && len < schema["minItems"].as<size_t>()) {
+            result.addError(prefix.isEmpty() ? String("(root)") : prefix,
+                            "must have >= " + String((unsigned long)schema["minItems"].as<size_t>()) + " items");
+        }
+        if (schema.containsKey("maxItems") && len > schema["maxItems"].as<size_t>()) {
+            result.addError(prefix.isEmpty() ? String("(root)") : prefix,
+                            "must have <= " + String((unsigned long)schema["maxItems"].as<size_t>()) + " items");
         }
     }
 

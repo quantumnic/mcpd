@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.35.0] — 2026-02-22
+
+### Added
+- **Tool Output Validation** (`MCPValidation.h`): Validates tool output against declared `outputSchema` after execution. When `enableOutputValidation()` is active, tools with `outputSchema` have their structured output checked for type correctness, required fields, numeric ranges, string lengths, array sizes, and enum constraints. Invalid output is replaced with a clear error result containing validation details — catches handler bugs before they reach the client.
+  - `validateValue()`: New standalone validation function for any JSON value against a schema (not just objects), supporting root-level type checks, enum, ranges, lengths, and recursive object delegation.
+  - `enableOutputValidation()` / `isOutputValidationEnabled()` on Server: opt-in output validation (disabled by default for backward compatibility).
+  - Works with both simple handlers (string return) and rich handlers (MCPToolResult).
+  - Non-JSON output from tools with outputSchema gracefully skips validation.
+- **25 new tests**: 16 standalone `validateValue` unit tests and 9 Server output validation integration tests. **Total: 1261 tests**.
+
+### Fixed
+- Version string sync: test expectations updated to match current version across all test suites (6 previously-broken assertions in test_jsonrpc, test_2025_11_25, test_infrastructure now pass).
+
 ## [0.34.0] — 2026-02-22
 
 ### Added

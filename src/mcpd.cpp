@@ -905,7 +905,29 @@ String Server::_handleToolsCall(JsonVariant params, JsonVariant id) {
                     JsonDocument structured;
                     DeserializationError err = deserializeJson(structured, toolResult.content[0].text);
                     if (!err) {
-                        resultObj["structuredContent"] = structured.as<JsonVariant>();
+                        // Output validation against declared outputSchema
+                        // Output validation against declared outputSchema
+                        if (_outputValidation) {
+                            JsonDocument outSchema;
+                            DeserializationError osErr = deserializeJson(outSchema, tool.outputSchemaJson);
+                            if (!osErr && outSchema.is<JsonObject>()) {
+                                ValidationResult vr = validateValue(structured.as<JsonVariant>(), outSchema.as<JsonObject>());
+                                if (!vr.valid) {
+                                    // Replace result with validation error
+                                    result.clear();
+                                    resultObj = result.to<JsonObject>();
+                                    JsonArray errContent = resultObj["content"].to<JsonArray>();
+                                    JsonObject errText = errContent.add<JsonObject>();
+                                    errText["type"] = "text";
+                                    errText["text"] = "Output validation failed: " + vr.toString();
+                                    resultObj["isError"] = true;
+                                    callIsError = true;
+                                }
+                            }
+                        }
+                        if (!callIsError) {
+                            resultObj["structuredContent"] = structured.as<JsonVariant>();
+                        }
                     }
                 }
 
@@ -935,7 +957,27 @@ String Server::_handleToolsCall(JsonVariant params, JsonVariant id) {
                     JsonDocument structured;
                     DeserializationError err = deserializeJson(structured, handlerResult);
                     if (!err) {
-                        result["structuredContent"] = structured.as<JsonVariant>();
+                        // Output validation against declared outputSchema
+                        if (_outputValidation) {
+                            JsonDocument outSchema;
+                            DeserializationError osErr = deserializeJson(outSchema, tool.outputSchemaJson);
+                            if (!osErr && outSchema.is<JsonObject>()) {
+                                ValidationResult vr = validateValue(structured.as<JsonVariant>(), outSchema.as<JsonObject>());
+                                if (!vr.valid) {
+                                    // Replace result with validation error
+                                    result.clear();
+                                    content = result["content"].to<JsonArray>();
+                                    textContent = content.add<JsonObject>();
+                                    textContent["type"] = "text";
+                                    textContent["text"] = "Output validation failed: " + vr.toString();
+                                    result["isError"] = true;
+                                    callIsError = true;
+                                }
+                            }
+                        }
+                        if (!callIsError) {
+                            result["structuredContent"] = structured.as<JsonVariant>();
+                        }
                     }
                 }
 
