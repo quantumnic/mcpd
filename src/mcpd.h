@@ -40,12 +40,13 @@
 #include "MCPHeap.h"
 #include "MCPAuth.h"
 #include "MCPMetrics.h"
+#include "MCPTask.h"
 
 #ifdef ESP32
 #include "MCPTransportBLE.h"
 #endif
 
-#define MCPD_VERSION "0.32.0"
+#define MCPD_VERSION "0.33.0"
 #define MCPD_MCP_PROTOCOL_VERSION "2025-11-25"
 #define MCPD_MCP_PROTOCOL_VERSION_COMPAT "2025-03-26"
 
@@ -334,6 +335,42 @@ public:
     /** Set a hook called after every tool call completes. */
     void onAfterToolCall(AfterToolCallHook hook) { _afterToolCallHook = hook; }
 
+    // ── Tasks (experimental, MCP 2025-11-25) ────────────────────────────
+
+    /** Access the task manager for async tool execution */
+    TaskManager& tasks() { return _taskManager; }
+
+    /**
+     * Enable task support for tools/call.
+     * When enabled, clients can send task-augmented requests.
+     */
+    void enableTasks(bool enable = true) { _taskManager.setEnabled(enable); }
+
+    /**
+     * Register an async tool handler for task-based execution.
+     * The handler is called when a tool is invoked as a task.
+     * It should call taskComplete() or taskFail() when done.
+     */
+    void addTaskTool(const char* name, const char* description,
+                     const char* inputSchemaJson, MCPTaskToolHandler handler,
+                     TaskSupport support = TaskSupport::Optional);
+
+    /**
+     * Complete a task with a result JSON string.
+     * Call from within async task handlers.
+     */
+    bool taskComplete(const String& taskId, const String& resultJson);
+
+    /**
+     * Fail a task with an error message.
+     */
+    bool taskFail(const String& taskId, const String& errorMessage);
+
+    /**
+     * Cancel a task.
+     */
+    bool taskCancel(const String& taskId);
+
     // ── JSON-RPC Error Data ────────────────────────────────────────────
 
     /**
@@ -449,6 +486,9 @@ private:
     HeapMonitor _heapMonitor;
     Auth _auth;
     Metrics _metrics;
+    TaskManager _taskManager;
+    std::map<String, MCPTaskToolHandler> _taskToolHandlers;
+    std::map<String, TaskSupport> _taskToolSupport;
 
     // Lifecycle callbacks
     InitCallback _onInitializeCb;
@@ -497,6 +537,10 @@ private:
     String _handleResourcesSubscribe(JsonVariant params, JsonVariant id);
     String _handleResourcesUnsubscribe(JsonVariant params, JsonVariant id);
     String _handleRootsList(JsonVariant params, JsonVariant id);
+    String _handleTasksGet(JsonVariant params, JsonVariant id);
+    String _handleTasksResult(JsonVariant params, JsonVariant id);
+    String _handleTasksList(JsonVariant params, JsonVariant id);
+    String _handleTasksCancel(JsonVariant params, JsonVariant id);
 
     // ── Helpers ────────────────────────────────────────────────────────
 

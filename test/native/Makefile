@@ -3,7 +3,7 @@ CXXFLAGS = -std=c++17 -Wall -Wextra -Wno-unused-parameter -DMCPD_TEST -pthread
 INCLUDES = -I../../src -I../mock_includes -I..
 
 # Targets
-TESTS = test_jsonrpc test_tools test_mcp_http test_infrastructure test_modules test_auth_platform test_robustness test_session test_content_transport test_advanced test_integration test_output_annotations test_2025_11_25
+TESTS = test_jsonrpc test_tools test_mcp_http test_infrastructure test_modules test_auth_platform test_robustness test_session test_content_transport test_advanced test_integration test_output_annotations test_2025_11_25 test_tasks
 
 .PHONY: all clean test
 
@@ -48,6 +48,9 @@ test_output_annotations: ../test_output_annotations.cpp ../arduino_mock.h ../tes
 test_2025_11_25: ../test_2025_11_25.cpp ../arduino_mock.h ../test_framework.h ../../src/mcpd.h ../../src/mcpd.cpp ../../src/MCPIcon.h ../../src/MCPTool.h ../../src/MCPResource.h ../../src/MCPResourceTemplate.h ../../src/MCPPrompt.h ../../src/MCPContent.h
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ ../test_2025_11_25.cpp
 
+test_tasks: ../test_tasks.cpp ../arduino_mock.h ../test_framework.h ../../src/mcpd.h ../../src/mcpd.cpp ../../src/MCPTask.h
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ ../test_tasks.cpp
+
 test: $(TESTS)
 	@echo ""
 	@echo "══════════════════════════════════════════"
@@ -67,6 +70,7 @@ test: $(TESTS)
 	@./test_integration
 	@./test_output_annotations
 	@./test_2025_11_25
+	@./test_tasks
 	@echo "All test suites completed."
 
 clean:

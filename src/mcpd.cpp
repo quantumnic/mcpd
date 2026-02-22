@@ -564,6 +564,12 @@ String Server::_dispatch(const char* method, JsonVariant params, JsonVariant id)
     if (m == "resources/unsubscribe")   return _recordAndReturn(_handleResourcesUnsubscribe(params, id));
     if (m == "roots/list")              return _recordAndReturn(_handleRootsList(params, id));
 
+    // Tasks (experimental, MCP 2025-11-25)
+    if (m == "tasks/get")               return _recordAndReturn(_handleTasksGet(params, id));
+    if (m == "tasks/result")            return _recordAndReturn(_handleTasksResult(params, id));
+    if (m == "tasks/list")              return _recordAndReturn(_handleTasksList(params, id));
+    if (m == "tasks/cancel")            return _recordAndReturn(_handleTasksCancel(params, id));
+
     // notifications/initialized — no response needed
     if (m == "notifications/initialized") { _metrics.recordRequest(m, millis() - _dispatchStart); return ""; }
     // notifications/cancelled — cancel in-flight request
@@ -664,6 +670,16 @@ String Server::_handleInitialize(JsonVariant params, JsonVariant id) {
         capabilities["completion"].to<JsonObject>();
     }
 
+    // Advertise tasks capability (experimental, MCP 2025-11-25)
+    if (_taskManager.isEnabled()) {
+        JsonObject tasksCap = capabilities["tasks"].to<JsonObject>();
+        tasksCap["list"].to<JsonObject>();
+        tasksCap["cancel"].to<JsonObject>();
+        JsonObject tasksReqs = tasksCap["requests"].to<JsonObject>();
+        JsonObject tasksTools = tasksReqs["tools"].to<JsonObject>();
+        tasksTools["call"].to<JsonObject>();
+    }
+
     // Include rate limit info in server info if enabled
     if (_rateLimiter.isEnabled()) {
         JsonObject rateLimit = serverInfo["rateLimit"].to<JsonObject>();
@@ -702,6 +718,13 @@ String Server::_handleToolsList(JsonVariant params, JsonVariant id) {
         if (_disabledTools.count(_tools[i].name)) continue;
         JsonObject obj = tools.add<JsonObject>();
         _tools[i].toJson(obj);
+
+        // Add execution.taskSupport if this tool has task support configured
+        auto tsIt = _taskToolSupport.find(_tools[i].name);
+        if (tsIt != _taskToolSupport.end() && tsIt->second != TaskSupport::Forbidden) {
+            JsonObject execution = obj["execution"].to<JsonObject>();
+            execution["taskSupport"] = taskSupportToString(tsIt->second);
+        }
     }
 
     String resultStr;
@@ -735,6 +758,13 @@ String Server::_handleToolsCall(JsonVariant params, JsonVariant id) {
         _requestTracker.trackRequest(requestId, progressToken);
     }
 
+    // Check for task-augmented request (MCP 2025-11-25)
+    bool isTaskRequest = !params["task"].isNull();
+    if (isTaskRequest && !_taskManager.isEnabled()) {
+        if (!requestId.isEmpty()) _requestTracker.completeRequest(requestId);
+        return _jsonRpcError(id, -32601, "Tasks not supported");
+    }
+
     // Reject disabled tools
     if (_disabledTools.count(String(toolName))) {
         if (!requestId.isEmpty()) {
@@ -747,6 +777,70 @@ String Server::_handleToolsCall(JsonVariant params, JsonVariant id) {
     for (const auto& tool : _tools) {
         if (tool.name == toolName) {
             JsonObject arguments = params["arguments"].as<JsonObject>();
+
+            // Handle task-augmented request
+            if (isTaskRequest) {
+                // Check tool-level task support
+                auto tsIt = _taskToolSupport.find(String(toolName));
+                TaskSupport ts = (tsIt != _taskToolSupport.end()) ? tsIt->second : TaskSupport::Forbidden;
+                if (ts == TaskSupport::Forbidden) {
+                    if (!requestId.isEmpty()) _requestTracker.completeRequest(requestId);
+                    return _jsonRpcError(id, -32601, "Tool does not support task execution");
+                }
+
+                // Check for async handler
+                auto handlerIt = _taskToolHandlers.find(String(toolName));
+                if (handlerIt == _taskToolHandlers.end()) {
+                    if (!requestId.isEmpty()) _requestTracker.completeRequest(requestId);
+                    return _jsonRpcError(id, -32601, "No async handler for tool");
+                }
+
+                // Extract requested TTL
+                int64_t ttl = -1;
+                if (!params["task"]["ttl"].isNull()) {
+                    ttl = (int64_t)params["task"]["ttl"].as<long>();
+                }
+
+                // Create the task
+                String taskId = _taskManager.createTask(toolName, ttl);
+                MCPTask* task = _taskManager.getTask(taskId);
+
+                // Before-call hook for task
+                if (_beforeToolCallHook) {
+                    ToolCallContext ctx;
+                    ctx.toolName = toolName;
+                    ctx.args = &arguments;
+                    ctx.startMs = millis();
+                    ctx.durationMs = 0;
+                    ctx.isError = false;
+                    if (!_beforeToolCallHook(ctx)) {
+                        _taskManager.cancelTask(taskId);
+                        if (!requestId.isEmpty()) _requestTracker.completeRequest(requestId);
+                        return _jsonRpcError(id, -32600, "Tool call rejected");
+                    }
+                }
+
+                // Invoke async handler
+                handlerIt->second(taskId, params["arguments"]);
+
+                // Return CreateTaskResult
+                JsonDocument result;
+                JsonObject taskObj = result["task"].to<JsonObject>();
+                task->toJson(taskObj);
+
+                if (!requestId.isEmpty()) _requestTracker.completeRequest(requestId);
+
+                String resultStr;
+                serializeJson(result, resultStr);
+                return _jsonRpcResult(id, resultStr);
+            }
+
+            // Check if tool requires task execution
+            auto tsIt = _taskToolSupport.find(String(toolName));
+            if (tsIt != _taskToolSupport.end() && tsIt->second == TaskSupport::Required) {
+                if (!requestId.isEmpty()) _requestTracker.completeRequest(requestId);
+                return _jsonRpcError(id, -32601, "Tool requires task execution");
+            }
 
             // Before-call hook: allow rejection
             if (_beforeToolCallHook) {
@@ -1145,6 +1239,184 @@ String Server::_handleRootsList(JsonVariant /* params */, JsonVariant id) {
         JsonObject obj = roots.add<JsonObject>();
         root.toJson(obj);
     }
+
+    String resultStr;
+    serializeJson(result, resultStr);
+    return _jsonRpcResult(id, resultStr);
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// Tasks (experimental, MCP 2025-11-25)
+// ════════════════════════════════════════════════════════════════════════
+
+void Server::addTaskTool(const char* name, const char* description,
+                         const char* inputSchemaJson, MCPTaskToolHandler handler,
+                         TaskSupport support) {
+    // Register as a normal tool with a placeholder handler
+    _tools.emplace_back(name, description, inputSchemaJson,
+        [](const JsonObject&) -> String { return "{}"; });
+    _taskToolHandlers[String(name)] = handler;
+    _taskToolSupport[String(name)] = support;
+}
+
+bool Server::taskComplete(const String& taskId, const String& resultJson) {
+    bool ok = _taskManager.completeTask(taskId, resultJson);
+    if (ok) {
+        // Send status notification
+        MCPTask* task = _taskManager.getTask(taskId);
+        if (task) {
+            JsonDocument doc;
+            doc["jsonrpc"] = "2.0";
+            doc["method"] = "notifications/tasks/status";
+            JsonObject params = doc["params"].to<JsonObject>();
+            task->toJson(params);
+            String output;
+            serializeJson(doc, output);
+            _pendingNotifications.push_back(output);
+        }
+    }
+    return ok;
+}
+
+bool Server::taskFail(const String& taskId, const String& errorMessage) {
+    bool ok = _taskManager.failTask(taskId, errorMessage);
+    if (ok) {
+        MCPTask* task = _taskManager.getTask(taskId);
+        if (task) {
+            JsonDocument doc;
+            doc["jsonrpc"] = "2.0";
+            doc["method"] = "notifications/tasks/status";
+            JsonObject params = doc["params"].to<JsonObject>();
+            task->toJson(params);
+            String output;
+            serializeJson(doc, output);
+            _pendingNotifications.push_back(output);
+        }
+    }
+    return ok;
+}
+
+bool Server::taskCancel(const String& taskId) {
+    bool ok = _taskManager.cancelTask(taskId);
+    if (ok) {
+        MCPTask* task = _taskManager.getTask(taskId);
+        if (task) {
+            JsonDocument doc;
+            doc["jsonrpc"] = "2.0";
+            doc["method"] = "notifications/tasks/status";
+            JsonObject params = doc["params"].to<JsonObject>();
+            task->toJson(params);
+            String output;
+            serializeJson(doc, output);
+            _pendingNotifications.push_back(output);
+        }
+    }
+    return ok;
+}
+
+String Server::_handleTasksGet(JsonVariant params, JsonVariant id) {
+    const char* taskId = params["taskId"];
+    if (!taskId) {
+        return _jsonRpcError(id, -32602, "Missing taskId");
+    }
+
+    MCPTask* task = _taskManager.getTask(String(taskId));
+    if (!task) {
+        return _jsonRpcError(id, -32602, "Task not found");
+    }
+
+    JsonDocument result;
+    JsonObject taskObj = result.to<JsonObject>(); task->toJson(taskObj);
+
+    String resultStr;
+    serializeJson(result, resultStr);
+    return _jsonRpcResult(id, resultStr);
+}
+
+String Server::_handleTasksResult(JsonVariant params, JsonVariant id) {
+    const char* taskId = params["taskId"];
+    if (!taskId) {
+        return _jsonRpcError(id, -32602, "Missing taskId");
+    }
+
+    MCPTask* task = _taskManager.getTask(String(taskId));
+    if (!task) {
+        return _jsonRpcError(id, -32602, "Task not found");
+    }
+
+    if (!isTerminalStatus(task->status)) {
+        // Task not yet complete — return current status as error
+        return _jsonRpcError(id, -32002, "Task not yet complete");
+    }
+
+    if (task->status == TaskStatus::Failed) {
+        return _jsonRpcError(id, -32000, task->statusMessage.c_str());
+    }
+
+    if (task->status == TaskStatus::Cancelled) {
+        return _jsonRpcError(id, -32000, "Task was cancelled");
+    }
+
+    // Return the stored result with related-task metadata
+    if (task->hasResult) {
+        // Parse and augment with _meta
+        JsonDocument resultDoc;
+        deserializeJson(resultDoc, task->resultJson);
+        JsonObject meta = resultDoc["_meta"].to<JsonObject>();
+        JsonObject relatedTask = meta["io.modelcontextprotocol/related-task"].to<JsonObject>();
+        relatedTask["taskId"] = task->taskId;
+
+        String resultStr;
+        serializeJson(resultDoc, resultStr);
+        return _jsonRpcResult(id, resultStr);
+    }
+
+    return _jsonRpcResult(id, "{}");
+}
+
+String Server::_handleTasksList(JsonVariant params, JsonVariant id) {
+    size_t startIdx = 0;
+    if (!params.isNull() && params["cursor"].is<const char*>()) {
+        startIdx = (size_t)atoi(params["cursor"].as<const char*>());
+    }
+
+    size_t nextIdx = 0;
+    auto tasks = _taskManager.listTasks(startIdx, 20, &nextIdx);
+
+    JsonDocument result;
+    JsonArray tasksArr = result["tasks"].to<JsonArray>();
+    for (const auto& task : tasks) {
+        JsonObject obj = tasksArr.add<JsonObject>();
+        task.toJson(obj);
+    }
+
+    if (nextIdx > 0) {
+        result["nextCursor"] = String(nextIdx);
+    }
+
+    String resultStr;
+    serializeJson(result, resultStr);
+    return _jsonRpcResult(id, resultStr);
+}
+
+String Server::_handleTasksCancel(JsonVariant params, JsonVariant id) {
+    const char* taskIdStr = params["taskId"];
+    if (!taskIdStr) {
+        return _jsonRpcError(id, -32602, "Missing taskId");
+    }
+
+    String taskId(taskIdStr);
+    if (!_taskManager.cancelTask(taskId)) {
+        return _jsonRpcError(id, -32602, "Task not found or already terminal");
+    }
+
+    MCPTask* task = _taskManager.getTask(taskId);
+    if (!task) {
+        return _jsonRpcError(id, -32602, "Task not found");
+    }
+
+    JsonDocument result;
+    JsonObject taskObj = result.to<JsonObject>(); task->toJson(taskObj);
 
     String resultStr;
     serializeJson(result, resultStr);

@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.33.0] — 2026-02-22
+
+### Added
+- **Tasks (experimental, MCP 2025-11-25)**: Full implementation of the async Tasks primitive. Tools can now execute asynchronously with durable state machines for long-running operations.
+  - `MCPTask.h`: Task state machine with `Working`, `InputRequired`, `Completed`, `Failed`, `Cancelled` lifecycle states.
+  - `TaskManager`: Creates, tracks, completes, fails, cancels tasks with TTL support and memory-safe eviction for MCU.
+  - `enableTasks()` on Server to advertise `tasks` capability with `list`, `cancel`, and `requests.tools.call`.
+  - `addTaskTool()`: Register tools with async handlers and per-tool `TaskSupport` (`forbidden`/`optional`/`required`).
+  - `taskComplete()`, `taskFail()`, `taskCancel()`: Server-side task lifecycle control with automatic `notifications/tasks/status` push.
+  - JSON-RPC dispatch for `tasks/get`, `tasks/result`, `tasks/list`, `tasks/cancel`.
+  - Task-augmented `tools/call`: Clients send `"task": {"ttl": 60000}` to create async tasks instead of blocking.
+  - `execution.taskSupport` field in `tools/list` response for tool-level task negotiation.
+  - `io.modelcontextprotocol/related-task` metadata in `tasks/result` responses.
+  - Before-hook integration: task-augmented calls respect `onBeforeToolCall()` rejection.
+- **41 new tests** covering TaskManager unit tests (status lifecycle, serialization, pagination, TTL, config) and Server integration tests (capability negotiation, task-augmented calls, get/result/list/cancel, forbidden/required enforcement, hooks). **Total: 1146 tests**.
+
 ## [0.31.0] — 2026-02-21
 
 ### Added
