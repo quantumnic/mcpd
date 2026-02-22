@@ -3,7 +3,7 @@ CXXFLAGS = -std=c++17 -Wall -Wextra -Wno-unused-parameter -DMCPD_TEST -pthread
 INCLUDES = -I../../src -I../mock_includes -I..
 
 # Targets
-TESTS = test_jsonrpc test_tools test_mcp_http test_infrastructure test_modules test_auth_platform test_robustness test_session test_content_transport test_advanced test_integration test_output_annotations test_2025_11_25 test_tasks
+TESTS = test_jsonrpc test_tools test_mcp_http test_infrastructure test_modules test_auth_platform test_robustness test_session test_content_transport test_advanced test_integration test_output_annotations test_2025_11_25 test_tasks test_validation
 
 .PHONY: all clean test
 
@@ -51,6 +51,9 @@ test_2025_11_25: ../test_2025_11_25.cpp ../arduino_mock.h ../test_framework.h ..
 test_tasks: ../test_tasks.cpp ../arduino_mock.h ../test_framework.h ../../src/mcpd.h ../../src/mcpd.cpp ../../src/MCPTask.h
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ ../test_tasks.cpp
 
+test_validation: ../test_validation.cpp ../arduino_mock.h ../test_framework.h ../../src/mcpd.h ../../src/mcpd.cpp ../../src/MCPValidation.h
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ ../test_validation.cpp
+
 test: $(TESTS)
 	@echo ""
 	@echo "══════════════════════════════════════════"
@@ -71,6 +74,7 @@ test: $(TESTS)
 	@./test_output_annotations
 	@./test_2025_11_25
 	@./test_tasks
+	@./test_validation
 	@echo "All test suites completed."
 
 clean:

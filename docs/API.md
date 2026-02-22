@@ -460,3 +460,38 @@ mcp.addIcon(MCPIcon("https://example.com/icon.png", "image/png")
 | `-32600` | Invalid request (missing jsonrpc version or method) |
 | `-32601` | Method not found |
 | `-32602` | Invalid params (missing tool name, tool not found, etc.) |
+
+### Input Validation
+
+Optional validation of tool call arguments against their declared `inputSchema`.
+
+```cpp
+mcp.enableInputValidation();  // Enable before begin()
+
+// Now tools with inputSchema get automatic validation:
+mcp.addTool("gpio_write", "Write a GPIO pin",
+    R"({"type":"object","properties":{
+        "pin":{"type":"integer","minimum":0,"maximum":39},
+        "value":{"type":"integer","enum":[0,1]}
+    },"required":["pin","value"]})",
+    [](const JsonObject& args) -> String {
+        // Handler only called if validation passes
+        return "ok";
+    });
+```
+
+**Supported checks:**
+- `required` — all required fields must be present and non-null
+- `type` — `string`, `number`, `integer`, `boolean`, `array`, `object`, `null`
+- `enum` — value must be one of the listed options
+- `minimum` / `maximum` — numeric range constraints
+- `minLength` / `maxLength` — string length constraints
+- `minItems` / `maxItems` — array length constraints
+- Recursive nested `object` validation with dotted field paths
+
+**Error response example:**
+```json
+{"jsonrpc":"2.0","id":1,"error":{"code":-32602,"message":"Invalid arguments: 'pin' must be <= 39.00; 'value' must be one of [0, 1]"}}
+```
+
+Disabled by default for backward compatibility. Enable with `mcp.enableInputValidation()`.

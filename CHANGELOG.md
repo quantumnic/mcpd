@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.34.0] — 2026-02-22
+
+### Added
+- **Tool Input Validation** (`MCPValidation.h`): Lightweight JSON Schema validation for tool call arguments. Validates required fields, types (`string`, `number`, `integer`, `boolean`, `array`, `object`, `null`), `enum` constraints, numeric ranges (`minimum`/`maximum`), string lengths (`minLength`/`maxLength`), array sizes (`minItems`/`maxItems`), and nested object schemas — all before invoking the tool handler.
+  - `enableInputValidation()` on Server: opt-in validation that checks arguments against declared `inputSchema`. Invalid calls receive a clear JSON-RPC `-32602` error with detailed field-level messages.
+  - `ValidationResult` with `toString()` for human-readable errors and `toJson()` for structured error data.
+  - Recursive nested object validation with dotted field paths (e.g. `config.interval`).
+  - Designed for MCU: no heap-heavy schema libraries, just practical checks.
+- **52 new tests** covering all validation checks (required, types, enum, ranges, lengths, arrays, nesting, error formatting) and 8 Server integration tests. **Total: 1198 tests**.
+
 ## [0.33.1] — 2026-02-22
 
 ### Added

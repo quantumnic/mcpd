@@ -41,12 +41,13 @@
 #include "MCPAuth.h"
 #include "MCPMetrics.h"
 #include "MCPTask.h"
+#include "MCPValidation.h"
 
 #ifdef ESP32
 #include "MCPTransportBLE.h"
 #endif
 
-#define MCPD_VERSION "0.33.1"
+#define MCPD_VERSION "0.34.0"
 #define MCPD_MCP_PROTOCOL_VERSION "2025-11-25"
 #define MCPD_MCP_PROTOCOL_VERSION_COMPAT "2025-03-26"
 
@@ -371,6 +372,21 @@ public:
      */
     bool taskCancel(const String& taskId);
 
+    // ── Input Validation ────────────────────────────────────────────────
+
+    /**
+     * Enable automatic validation of tool call arguments against inputSchema.
+     * When enabled, the server validates required fields, types, enums,
+     * numeric ranges, string lengths, and array sizes before invoking handlers.
+     *
+     * Invalid calls receive a JSON-RPC error (-32602) with detailed messages.
+     * Disabled by default for backward compatibility.
+     */
+    void enableInputValidation(bool enable = true) { _inputValidation = enable; }
+
+    /** Check if input validation is enabled */
+    bool isInputValidationEnabled() const { return _inputValidation; }
+
     // ── JSON-RPC Error Data ────────────────────────────────────────────
 
     /**
@@ -487,6 +503,7 @@ private:
     Auth _auth;
     Metrics _metrics;
     TaskManager _taskManager;
+    bool _inputValidation = false;
     std::map<String, MCPTaskToolHandler> _taskToolHandlers;
     std::map<String, TaskSupport> _taskToolSupport;
 

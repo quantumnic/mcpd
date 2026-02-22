@@ -778,6 +778,19 @@ String Server::_handleToolsCall(JsonVariant params, JsonVariant id) {
         if (tool.name == toolName) {
             JsonObject arguments = params["arguments"].as<JsonObject>();
 
+            // Input validation against declared schema
+            if (_inputValidation && !tool.inputSchemaJson.isEmpty()) {
+                JsonDocument schemaDoc;
+                DeserializationError schemaErr = deserializeJson(schemaDoc, tool.inputSchemaJson);
+                if (!schemaErr && schemaDoc.is<JsonObject>()) {
+                    ValidationResult vr = validateArguments(arguments, schemaDoc.as<JsonObject>());
+                    if (!vr.valid) {
+                        if (!requestId.isEmpty()) _requestTracker.completeRequest(requestId);
+                        return _jsonRpcError(id, -32602, vr.toString().c_str());
+                    }
+                }
+            }
+
             // Handle task-augmented request
             if (isTaskRequest) {
                 // Check tool-level task support
