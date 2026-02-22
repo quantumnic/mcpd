@@ -43,12 +43,13 @@
 #include "MCPTask.h"
 #include "MCPValidation.h"
 #include "MCPCache.h"
+#include "MCPScheduler.h"
 
 #ifdef ESP32
 #include "MCPTransportBLE.h"
 #endif
 
-#define MCPD_VERSION "0.36.0"
+#define MCPD_VERSION "0.37.0"
 #define MCPD_MCP_PROTOCOL_VERSION "2025-11-25"
 #define MCPD_MCP_PROTOCOL_VERSION_COMPAT "2025-03-26"
 
