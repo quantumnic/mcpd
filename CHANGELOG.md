@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.41.0] — 2026-02-23
+
+### Added
+- **State Store** (`MCPStateStore.h`): General-purpose key-value state store for microcontrollers. Designed for storing device state, calibration data, user preferences, and runtime config that persists across application logic (pair with NVS/EEPROM for reboot persistence).
+  - `StateStore`: Bounded or unlimited key-value store with `set()`, `get()`, `has()`, `remove()`, `clear()`.
+  - **Namespaced keys**: Use dotted keys (e.g., `"sensor.temp"`, `"config.name"`) and filter with `keys("sensor.")`.
+  - **Change listeners**: `onChange()` callback with old/new values, listener removal by ID.
+  - **Dirty tracking**: `isDirty()`, `dirtyKeys()`, `clearDirty()` for efficient persistence — only write changed keys to flash.
+  - **Bounded size**: Optional `maxEntries` with LRU-style eviction (evicts oldest-accessed entry).
+  - **TTL support**: Optional per-key expiry with `purgeExpired()`.
+  - **Transactions**: `begin()` / `commit()` / `rollback()` for atomic batch updates — changes buffered until commit, listeners fire only on commit.
+  - **JSON serialization**: `toJSON()` / `fromJSON()` for snapshot export/import, `toDetailedJSON()` with metadata, `statsJSON()`.
+  - Eviction and deletion notify listeners for consistent state tracking.
+- **45 new tests**: Full coverage of StateStore operations, namespaces, dirty tracking, listeners, eviction, TTL, transactions, JSON round-trip, and edge cases. **Total: 1457 tests**.
+
+### Fixed
+- Version sync: `library.properties` now matches `MCPD_VERSION`.
+
 ## [0.36.0] — 2026-02-22
 
 ### Added

@@ -46,12 +46,13 @@
 #include "MCPCache.h"
 #include "MCPScheduler.h"
 #include "MCPEventStore.h"
+#include "MCPStateStore.h"
 
 #ifdef ESP32
 #include "MCPTransportBLE.h"
 #endif
 
-#define MCPD_VERSION "0.40.0"
+#define MCPD_VERSION "0.41.0"
 #define MCPD_MCP_PROTOCOL_VERSION "2025-11-25"
 #define MCPD_MCP_PROTOCOL_VERSION_COMPAT "2025-03-26"
 

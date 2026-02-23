@@ -3,7 +3,7 @@ CXXFLAGS = -std=c++17 -Wall -Wextra -Wno-unused-parameter -DMCPD_TEST -pthread
 INCLUDES = -I../../src -I../mock_includes -I..
 
 # Targets
-TESTS = test_jsonrpc test_tools test_mcp_http test_infrastructure test_modules test_auth_platform test_robustness test_session test_content_transport test_advanced test_integration test_output_annotations test_2025_11_25 test_tasks test_validation test_cache test_scheduler test_pipeline test_toolgroups test_eventstore
+TESTS = test_jsonrpc test_tools test_mcp_http test_infrastructure test_modules test_auth_platform test_robustness test_session test_content_transport test_advanced test_integration test_output_annotations test_2025_11_25 test_tasks test_validation test_cache test_scheduler test_pipeline test_toolgroups test_eventstore test_statestore
 
 .PHONY: all clean test
 
@@ -69,6 +69,9 @@ test_toolgroups: ../test_toolgroups.cpp ../arduino_mock.h ../test_framework.h ..
 test_eventstore: ../test_eventstore.cpp ../arduino_mock.h ../test_framework.h ../../src/MCPEventStore.h
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ ../test_eventstore.cpp
 
+test_statestore: ../test_statestore.cpp ../arduino_mock.h ../test_framework.h ../../src/MCPStateStore.h
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ ../test_statestore.cpp
+
 test: $(TESTS)
 	@echo ""
 	@echo "══════════════════════════════════════════"
@@ -95,6 +98,7 @@ test: $(TESTS)
 	@./test_pipeline
 	@./test_toolgroups
 	@./test_eventstore
+	@./test_statestore
 	@echo "All test suites completed."
 
 clean:
