@@ -781,6 +781,19 @@ String Server::_handleToolsCall(JsonVariant params, JsonVariant id) {
         return _jsonRpcError(id, -32602, "Tool not found");
     }
 
+    // RBAC check: verify caller has permission for this tool
+    if (_accessControl.isEnabled()) {
+        // Extract API key from _meta.apiKey (set by auth layer) or use empty
+        const char* callerKey = nullptr;
+        if (!params["_meta"].isNull() && !params["_meta"]["apiKey"].isNull()) {
+            callerKey = params["_meta"]["apiKey"].as<const char*>();
+        }
+        if (!_accessControl.canAccess(toolName, callerKey)) {
+            if (!requestId.isEmpty()) _requestTracker.completeRequest(requestId);
+            return _jsonRpcError(id, -32603, "Access denied: insufficient permissions");
+        }
+    }
+
     // Find the tool
     for (const auto& tool : _tools) {
         if (tool.name == toolName) {

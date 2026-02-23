@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.42.0] — 2026-02-24
+
+### Added
+- **Access Control / RBAC** (`MCPAccessControl.h`): Role-based access control for tools. Associates API keys with roles, restricts tool access by role. Designed for MCU servers exposed on networks where you want to limit which clients can call destructive tools.
+  - `AccessControl`: Enable/disable RBAC, define roles, map API keys to roles, restrict tools to specific roles.
+  - `addRole()`, `removeRole()`, `hasRole()`, `roles()`: Role lifecycle management.
+  - `mapKeyToRole()`, `unmapKey()`, `roleForKey()`: Key-to-role associations.
+  - `restrictTool()`, `unrestrictTool()`, `isToolRestricted()`, `toolAllowedRoles()`: Per-tool access control.
+  - `canAccess(toolName, apiKey)`: Central access check — unrestricted tools always pass, restricted tools require matching role.
+  - `setDefaultRole()`: Configurable fallback role for unauthenticated/unmapped callers (default: "guest").
+  - `restrictDestructiveTools()`: Bulk-restrict multiple tools to admin roles.
+  - `toolsForRole()`: Query which tools a given role can access.
+  - `toJSON()`, `statsJSON()`: Serialization for debugging and monitoring.
+  - Server integration: `server.accessControl()` accessor, RBAC check in tool dispatch pipeline (before tool execution).
+  - Pairs with existing `MCPAuth.h` — auth identifies the caller, RBAC controls what they can do.
+- **36 new tests**: Full coverage of role management, key mapping, tool restrictions, access checks, edge cases, server integration. **Total: 1493 tests**.
+
+### Fixed
+- Version sync: all test files now reference correct MCPD_VERSION.
+
 ## [0.41.0] — 2026-02-23
 
 ### Added

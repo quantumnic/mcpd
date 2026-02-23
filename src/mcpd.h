@@ -47,12 +47,13 @@
 #include "MCPScheduler.h"
 #include "MCPEventStore.h"
 #include "MCPStateStore.h"
+#include "MCPAccessControl.h"
 
 #ifdef ESP32
 #include "MCPTransportBLE.h"
 #endif
 
-#define MCPD_VERSION "0.41.0"
+#define MCPD_VERSION "0.42.0"
 #define MCPD_MCP_PROTOCOL_VERSION "2025-11-25"
 #define MCPD_MCP_PROTOCOL_VERSION_COMPAT "2025-03-26"
 
@@ -314,6 +315,10 @@ public:
     /** Access the rate limiter for stats or manual control */
     RateLimiter& rateLimiter() { return _rateLimiter; }
 
+    // ── Access Control (RBAC) ──────────────────────────────────────────
+    /** Access the RBAC controller for role-based tool restrictions. */
+    AccessControl& accessControl() { return _accessControl; }
+
     // ── Session Management ─────────────────────────────────────────────
 
     /** Access session manager for multi-client session control */
@@ -563,6 +568,7 @@ private:
 #endif
 
     RateLimiter _rateLimiter;
+    AccessControl _accessControl;
     SessionManager _sessionManager;
     HeapMonitor _heapMonitor;
     Auth _auth;
