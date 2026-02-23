@@ -33,7 +33,7 @@
 |---|:---:|:---:|:---:|
 | Runs on the MCU | ✅ | ✅ | ❌ CLI tool |
 | MCP spec compliant | ✅ 2025-11-25 | ❌ custom WS | ❌ |
-| Actually compiles | ✅ 1332 tests | ❌ self-described | N/A |
+| Actually compiles | ✅ 1412 tests | ❌ self-described | N/A |
 | Streamable HTTP + SSE | ✅ | ❌ | ❌ |
 | WebSocket transport | ✅ | ✅ | ❌ |
 | Claude Desktop bridge | ✅ | ❌ | ❌ |

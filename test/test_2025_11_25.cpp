@@ -35,14 +35,14 @@ static String initReq() {
 
 TEST(protocol_version_2025_11_25) {
     ASSERT_EQ(String(MCPD_MCP_PROTOCOL_VERSION), String("2025-11-25"));
-    ASSERT_EQ(String(MCPD_VERSION), String("0.39.0"));
+    ASSERT_EQ(String(MCPD_VERSION), String("0.40.0"));
 }
 
 TEST(initialize_returns_2025_11_25) {
     auto* s = makeServer();
     String resp = dispatch(*s, initReq().c_str());
     ASSERT_STR_CONTAINS(resp.c_str(), "2025-11-25");
-    ASSERT_STR_CONTAINS(resp.c_str(), "0.39.0");
+    ASSERT_STR_CONTAINS(resp.c_str(), "0.40.0");
 }
 
 TEST(compat_version_defined) {
