@@ -3,7 +3,7 @@ CXXFLAGS = -std=c++17 -Wall -Wextra -Wno-unused-parameter -DMCPD_TEST -pthread
 INCLUDES = -I../../src -I../mock_includes -I..
 
 # Targets
-TESTS = test_jsonrpc test_tools test_mcp_http test_infrastructure test_modules test_auth_platform test_robustness test_session test_content_transport test_advanced test_integration test_output_annotations test_2025_11_25 test_tasks test_validation test_cache test_scheduler test_pipeline test_toolgroups test_eventstore test_statestore test_accesscontrol test_auditlog test_alerts
+TESTS = test_jsonrpc test_tools test_mcp_http test_infrastructure test_modules test_auth_platform test_robustness test_session test_content_transport test_advanced test_integration test_output_annotations test_2025_11_25 test_tasks test_validation test_cache test_scheduler test_pipeline test_toolgroups test_eventstore test_statestore test_accesscontrol test_auditlog test_alerts test_watchdog
 
 .PHONY: all clean test
 
@@ -102,6 +102,7 @@ test: $(TESTS)
 	@./test_accesscontrol
 	@./test_auditlog
 	@./test_alerts
+	@./test_watchdog
 	@echo "All test suites completed."
 
 clean:
@@ -115,3 +116,6 @@ test_auditlog: ../test_auditlog.cpp ../arduino_mock.h ../test_framework.h ../../
 
 test_alerts: ../test_alerts.cpp ../arduino_mock.h ../test_framework.h ../../src/MCPAlerts.h
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ ../test_alerts.cpp
+
+test_watchdog: ../test_watchdog.cpp ../arduino_mock.h ../test_framework.h ../../src/MCPWatchdog.h
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ ../test_watchdog.cpp

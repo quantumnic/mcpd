@@ -49,12 +49,13 @@
 #include "MCPStateStore.h"
 #include "MCPAccessControl.h"
 #include "MCPAuditLog.h"
+#include "MCPWatchdog.h"
 
 #ifdef ESP32
 #include "MCPTransportBLE.h"
 #endif
 
-#define MCPD_VERSION "0.44.0"
+#define MCPD_VERSION "0.45.0"
 #define MCPD_MCP_PROTOCOL_VERSION "2025-11-25"
 #define MCPD_MCP_PROTOCOL_VERSION_COMPAT "2025-03-26"
 
