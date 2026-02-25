@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.48.0] — 2026-02-25
+
+### Added
+- **CircuitBreaker** (`MCPCircuitBreaker.h`): Circuit breaker pattern for tool calls — prevents repeated calls to failing hardware/peripherals, allowing recovery time. Essential for MCU environments where I2C devices freeze, sensors disconnect, or network calls timeout.
+  - Three states: CLOSED → OPEN → HALF_OPEN with configurable failure threshold and recovery timeout
+  - `CircuitBreakerRegistry` — per-key circuit breakers with LRU eviction for bounded memory
+  - State change callbacks, manual trip/reset, retry-after estimation
+  - JSON serialization for diagnostics
+  - 37 new tests (unit + integration scenarios)
+
+### Changed
+- Total test count: 1772
+
 ## [0.47.0] — 2026-02-25
 
 ### Added

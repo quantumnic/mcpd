@@ -51,12 +51,13 @@
 #include "MCPAuditLog.h"
 #include "MCPWatchdog.h"
 #include "MCPHealthCheck.h"
+#include "MCPCircuitBreaker.h"
 
 #ifdef ESP32
 #include "MCPTransportBLE.h"
 #endif
 
-#define MCPD_VERSION "0.47.0"
+#define MCPD_VERSION "0.48.0"
 #define MCPD_MCP_PROTOCOL_VERSION "2025-11-25"
 #define MCPD_MCP_PROTOCOL_VERSION_COMPAT "2025-03-26"
 

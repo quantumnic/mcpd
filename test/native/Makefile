@@ -3,7 +3,7 @@ CXXFLAGS = -std=c++17 -Wall -Wextra -Wno-unused-parameter -DMCPD_TEST -pthread
 INCLUDES = -I../../src -I../mock_includes -I..
 
 # Targets
-TESTS = test_jsonrpc test_tools test_mcp_http test_infrastructure test_modules test_auth_platform test_robustness test_session test_content_transport test_advanced test_integration test_output_annotations test_2025_11_25 test_tasks test_validation test_cache test_scheduler test_pipeline test_toolgroups test_eventstore test_statestore test_accesscontrol test_auditlog test_alerts test_watchdog test_healthcheck test_ratelimit
+TESTS = test_jsonrpc test_tools test_mcp_http test_infrastructure test_modules test_auth_platform test_robustness test_session test_content_transport test_advanced test_integration test_output_annotations test_2025_11_25 test_tasks test_validation test_cache test_scheduler test_pipeline test_toolgroups test_eventstore test_statestore test_accesscontrol test_auditlog test_alerts test_watchdog test_healthcheck test_ratelimit test_circuitbreaker
 
 .PHONY: all clean test
 
@@ -105,6 +105,7 @@ test: $(TESTS)
 	@./test_watchdog
 	@./test_healthcheck
 	@./test_ratelimit
+	@./test_circuitbreaker
 	@echo "All test suites completed."
 
 clean:
@@ -127,3 +128,6 @@ test_healthcheck: ../test_healthcheck.cpp ../arduino_mock.h ../test_framework.h 
 
 test_ratelimit: ../test_ratelimit.cpp ../arduino_mock.h ../test_framework.h ../../src/MCPRateLimit.h ../../src/mcpd.h ../../src/mcpd.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ ../test_ratelimit.cpp
+
+test_circuitbreaker: ../test_circuitbreaker.cpp ../arduino_mock.h ../test_framework.h ../../src/MCPCircuitBreaker.h
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ ../test_circuitbreaker.cpp
