@@ -401,7 +401,7 @@ TEST(hc_cache_duration) {
 }
 
 TEST(hc_version) {
-    ASSERT_EQ(String(MCPD_VERSION), String("0.46.0"));
+    ASSERT_EQ(String(MCPD_VERSION), String("0.47.0"));
 }
 
 // ─── Main ───

@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.47.0] — 2026-02-25
+
+### Added
+- **KeyedRateLimiter** — per-key (per-client, per-tool, per-IP) rate limiting with LRU eviction, bounded memory pool
+- Variable cost support for RateLimiter (`tryAcquire(cost)`) — charge more tokens for expensive operations
+- `retryAfterMs()` on RateLimiter — estimated wait time until next token available
+- `toJson()` serialization for both `RateLimiter` and `KeyedRateLimiter`
+- 36 new tests for rate limiting (global, per-key, server integration)
+
+### Changed
+- Total test count: 1735
+
 ## [0.46.0] — 2026-02-24
 
 ### Added
