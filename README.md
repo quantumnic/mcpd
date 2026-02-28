@@ -33,7 +33,7 @@
 |---|:---:|:---:|:---:|
 | Runs on the MCU | ✅ | ✅ | ❌ CLI tool |
 | MCP spec compliant | ✅ 2025-11-25 | ❌ custom WS | ❌ |
-| Actually compiles | ✅ 1772 tests | ❌ self-described | N/A |
+| Actually compiles | ✅ 1827 tests | ❌ self-described | N/A |
 | Streamable HTTP + SSE | ✅ | ❌ | ❌ |
 | WebSocket transport | ✅ | ✅ | ❌ |
 | Claude Desktop bridge | ✅ | ❌ | ❌ |
@@ -58,6 +58,7 @@
 | Prometheus Metrics | ✅ | ❌ | ❌ |
 | Health Checks (component-level) | ✅ | ❌ | ❌ |
 | Circuit Breaker (fault tolerance) | ✅ | ❌ | ❌ |
+| Retry Policies (exponential backoff) | ✅ | ❌ | ❌ |
 | Captive Portal + Setup CLI | ✅ | ❌ | ❌ |
 | Hardware Abstraction Layer | ✅ | ❌ | ❌ |
 | Resource Subscriptions | ✅ | ❌ | ❌ |

@@ -719,7 +719,7 @@ TEST(completion_manager_no_providers) {
 // ═══════════════════════════════════════════════════════════════════════
 
 TEST(version_constants) {
-    ASSERT_EQ(String(MCPD_VERSION), String("0.48.0"));
+    ASSERT_EQ(String(MCPD_VERSION), String("0.49.0"));
     ASSERT_EQ(String(MCPD_MCP_PROTOCOL_VERSION), String("2025-11-25"));
 }
 

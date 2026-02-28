@@ -361,7 +361,7 @@ TEST(server_ratelimit_in_info) {
 }
 
 TEST(rl_version) {
-    ASSERT_EQ(String(MCPD_VERSION), String("0.48.0"));
+    ASSERT_EQ(String(MCPD_VERSION), String("0.49.0"));
 }
 
 // ─── Main ───
