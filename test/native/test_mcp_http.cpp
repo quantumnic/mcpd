@@ -123,15 +123,11 @@ public:
         // We don't call mcp->begin() because that uses the mock WebServer.
         // Instead we create our own POSIX socket server and dispatch to mcpd internals.
 
-        // But we need the server to be initialized (tools registered, etc.)
-        // Let's initialize it by calling begin and then replacing the transport.
-        // Actually, we can call _processJsonRpc directly since MCPD_TEST exposes internals.
-        // But we want REAL HTTP. So let's build a minimal HTTP server that calls _processJsonRpc.
-
         // First, we need to init the mcpd server state (generate session ID on init request)
         // We just use _processJsonRpc for the JSON-RPC layer. The HTTP layer we build ourselves.
 
         serverFd = socket(AF_INET, SOCK_STREAM, 0);
+        if (serverFd < 0) throw std::runtime_error("test server: socket() failed");
         int opt = 1;
         setsockopt(serverFd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 #ifdef SO_REUSEPORT
@@ -142,8 +138,27 @@ public:
         addr.sin_family = AF_INET;
         addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
         addr.sin_port = htons(port);
-        bind(serverFd, (struct sockaddr*)&addr, sizeof(addr));
-        listen(serverFd, 8);
+        if (bind(serverFd, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
+            close(serverFd);
+            serverFd = -1;
+            throw std::runtime_error("test server: bind() failed");
+        }
+
+        // Resolve the actual bound port. Passing 0 lets the OS allocate an
+        // available ephemeral port, avoiding collisions in parallel CI jobs.
+        socklen_t alen = sizeof(addr);
+        if (getsockname(serverFd, (struct sockaddr*)&addr, &alen) != 0) {
+            close(serverFd);
+            serverFd = -1;
+            throw std::runtime_error("test server: getsockname() failed");
+        }
+        port = ntohs(addr.sin_port);
+
+        if (listen(serverFd, 8) != 0) {
+            close(serverFd);
+            serverFd = -1;
+            throw std::runtime_error("test server: listen() failed");
+        }
         fcntl(serverFd, F_SETFL, O_NONBLOCK);
 
         running = true;
@@ -422,7 +437,7 @@ static int tests_failed = 0;
     if (_h.find(needle) == std::string::npos) throw "String missing: " #needle; \
 } while(0)
 
-static uint16_t PORT = 18923;
+static uint16_t PORT = 0;
 
 static std::string jsonRpc(const std::string& method, const std::string& params, int id = 1) {
     return R"({"jsonrpc":"2.0","id":)" + std::to_string(id) +
@@ -738,10 +753,10 @@ void test_content_type_json() {
 int main() {
     printf("\n  mcpd — Native HTTP Integration Tests\n");
     printf("  ════════════════════════════════════════\n\n");
-    printf("  Starting MCP server on localhost:%d...\n\n", PORT);
-
     PosixMCPServer server(PORT);
     server.start();
+    PORT = server.port;
+    printf("  Started MCP server on localhost:%d.\n\n", PORT);
 
     RUN_TEST(initialize);
     RUN_TEST(ping);
