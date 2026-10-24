@@ -117,7 +117,7 @@ platform = espressif32
 board = esp32dev
 framework = arduino
 lib_deps =
-    mcpd
+    https://github.com/quantumnic/mcpd.git
     bblanchon/ArduinoJson@^7
 ```
 
