@@ -11,7 +11,7 @@
  *
  * Dependencies (platformio.ini):
  *   lib_deps =
- *     redbasecap-buiss/mcpd
+ *     quantumnic/mcpd
  *     paulstoffregen/OneWire
  *     milesburton/DallasTemperature
  */

@@ -2,7 +2,7 @@
  * mcpd — MCP Server SDK for Microcontrollers
  *
  * Implements Model Context Protocol (2025-03-26) with Streamable HTTP transport.
- * https://github.com/redbasecap-buiss/mcpd
+ * https://github.com/quantumnic/mcpd
  *
  * MIT License — Nicola Spieser
  */

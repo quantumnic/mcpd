@@ -393,9 +393,9 @@ TEST(server_description_in_initialize) {
 
 TEST(server_website_url_in_initialize) {
     auto* s = makeServer();
-    s->setWebsiteUrl("https://github.com/redbasecap-buiss/mcpd");
+    s->setWebsiteUrl("https://github.com/quantumnic/mcpd");
     String resp = dispatch(*s, initReq().c_str());
-    ASSERT_STR_CONTAINS(resp.c_str(), "\"websiteUrl\":\"https://github.com/redbasecap-buiss/mcpd\"");
+    ASSERT_STR_CONTAINS(resp.c_str(), "\"websiteUrl\":\"https://github.com/quantumnic/mcpd\"");
 }
 
 TEST(server_icons_in_initialize) {
